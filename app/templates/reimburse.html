@@ -1,18 +1,119 @@
 {% extends "base.html" %}
 {% block title %}Reimburse · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-6">Reimburse</h1>
-<section class="bg-white rounded-xl border border-slate-200 p-5">
-  <h2 class="font-semibold mb-3">Approved, unpaid expenses by employee</h2>
-  <table class="w-full text-sm">
-    <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Employee</th><th>Expenses</th><th class="text-right">Amount</th></tr></thead>
-    <tbody>
+<script>const PAYOUT = {{ {"ids": expense_ids, "batches": batches}|tojson }};</script>
+<div x-data="payouts()" x-init="init()">
+<h1 class="text-2xl font-semibold mb-1">Reimburse</h1>
+<p class="text-sm text-slate-500 mb-6">
+  {{ "Expenses selected in the queue." if selected else "All approved, unpaid expenses." }}
+  One PayPal Payouts batch, one payment per employee.
+  {% if selected %}<a href="/reimburse" class="text-indigo-600 underline">Show all</a>{% endif %}
+</p>
+
+<section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  {% if groups %}
+  <div class="space-y-5">
     {% for g in groups %}
-      <tr class="border-b border-slate-100"><td class="py-1">{{ g.employee }}</td><td>{{ g.count }}</td><td class="text-right">${{ "%.2f"|format(g.total) }}</td></tr>
+    <div>
+      <div class="flex flex-wrap items-baseline gap-3 mb-1">
+        <span class="font-semibold">{{ g.employee }}</span>
+        <span class="text-xs text-slate-500 font-mono">{{ g.paypal_email }}</span>
+        <span class="ml-auto font-mono font-semibold">${{ "{:,.2f}".format(g.total) }}</span>
+      </div>
+      <table class="w-full text-sm">
+        <tbody>
+        {% for r in g.rows %}
+          <tr class="border-t border-slate-100">
+            <td class="py-1 w-16 text-slate-400">#{{ r.id }}</td>
+            <td><a class="text-indigo-600 hover:underline" href="/expenses/{{ r.id }}">{{ r.vendor }}</a></td>
+            <td class="text-slate-500">{{ (r.purchased_at or "")[:10] }}</td>
+            <td class="text-slate-500">{{ r.category.replace("_", " ") }}</td>
+            <td>{% if r.late_days %}<span class="chip chip-flagged" title="Accountable plan, Reg. §1.62-2">substantiated after {{ r.late_days }} days: may be taxable to the employee</span>{% endif %}</td>
+            <td class="text-right font-mono">${{ "%.2f"|format(r.total) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% endfor %}
-      <tr class="font-semibold"><td class="py-2">Total</td><td></td><td class="text-right">${{ "%.2f"|format(grand_total) }}</td></tr>
-    </tbody>
-  </table>
-  <button disabled class="mt-4 bg-slate-300 text-white rounded-lg px-4 py-2 text-sm">Send PayPal Payouts (build step 7)</button>
+  </div>
+  <div class="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-slate-200">
+    <button @click="send()" :disabled="busy || sent" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">Send PayPal Payouts</button>
+    <span class="text-sm">{{ expense_ids|length }} expenses · {{ groups|length }} employees · <b class="font-mono">${{ "{:,.2f}".format(grand_total) }}</b></span>
+    <span x-show="error" x-text="error" class="text-sm text-red-700"></span>
+  </div>
+  {% else %}
+  <p class="text-sm text-slate-500">Nothing to reimburse. Approved expenses appear here until they are paid.</p>
+  {% endif %}
 </section>
+
+<section class="bg-white rounded-xl border border-slate-200 p-5" x-show="batches.length">
+  <h2 class="font-semibold mb-3">Payout batches</h2>
+  <template x-for="b in batches" :key="b.id">
+    <div class="mb-4 last:mb-0">
+      <div class="flex flex-wrap items-center gap-3 text-sm mb-1">
+        <span class="font-medium" x-text="'Batch #' + b.id"></span>
+        <span class="chip" :class="chipClass(b.status)" x-text="b.status.toLowerCase()"></span>
+        <span class="font-mono text-xs text-slate-500" x-text="b.paypal_batch_id"></span>
+        <span class="text-xs text-slate-400" x-show="!b.done">checking PayPal…</span>
+        <span class="ml-auto font-mono" x-text="usd(b.total)"></span>
+      </div>
+      <table class="w-full text-sm">
+        <tbody>
+          <template x-for="i in b.items" :key="i.employee">
+            <tr class="border-t border-slate-100">
+              <td class="py-1" x-text="i.employee"></td>
+              <td class="font-mono text-xs text-slate-500" x-text="i.paypal_email"></td>
+              <td class="text-slate-500" x-text="i.expense_ids.length + ' expenses'"></td>
+              <td><span class="chip" :class="chipClass(i.status)" x-text="label(i.status)"></span></td>
+              <td class="text-right font-mono" x-text="usd(i.amount)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </template>
+</section>
+</div>
+<script>
+  function payouts() {
+    return {
+      batches: PAYOUT.batches, busy: false, sent: false, error: "", timer: null,
+      usd: v => "$" + Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+      label: s => ({SUCCESS: "succeeded", UNCLAIMED: "unclaimed"}[s] || s.toLowerCase()),
+      chipClass(s) {
+        if (s === "SUCCESS") return "chip-approved";
+        if (["FAILED", "DENIED", "RETURNED", "BLOCKED", "REFUNDED", "REVERSED", "CANCELED"].includes(s)) return "chip-rejected";
+        return s === "UNCLAIMED" ? "chip-flagged" : "chip-needs_info";
+      },
+      init() { if (this.batches.some(b => !b.done)) this.poll(); },
+      async send() {
+        this.busy = true; this.error = "";
+        const r = await fetch("/api/payouts", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({expense_ids: PAYOUT.ids})});
+        const data = await r.json().catch(() => ({}));
+        this.busy = false;
+        if (!r.ok) { this.error = data.detail || "Could not send the payout"; return; }
+        this.sent = true;
+        this.batches = [data, ...this.batches];
+        this.poll();
+      },
+      // Backup for webhooks: ask PayPal until every open batch is final.
+      poll() {
+        clearInterval(this.timer);
+        this.timer = setInterval(async () => {
+          const open = this.batches.filter(b => !b.done);
+          if (!open.length) {
+            clearInterval(this.timer);
+            if (this.sent) setTimeout(() => window.location = "/reimburse", 2500);   // paid rows leave the list
+            return;
+          }
+          for (const b of open) {
+            const fresh = await (await fetch("/api/payouts/" + b.id)).json();
+            this.batches = this.batches.map(x => x.id === fresh.id ? fresh : x);
+          }
+        }, 1500);
+      },
+    };
+  }
+</script>
 {% endblock %}

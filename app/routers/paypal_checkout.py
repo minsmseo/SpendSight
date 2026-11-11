@@ -144,6 +144,14 @@ def complete_order(order_id: str, session: Session = Depends(get_session)):
     except PayPalError as exc:
         raise _paypal_error(exc)
 
+    result = finalize_order(session, expense, order)
+    return {"expense_id": expense.id, "status": result["status"], "decision": result["decision"],
+            "engine": result["engine"], "question": result["question"]}
+
+
+def finalize_order(session: Session, expense: Expense, order: dict) -> dict:
+    """Turn a paid (captured or authorized) PayPal order into a reviewed expense. Also used by the
+    webhook receiver when the browser never came back after the buyer approved."""
     receipt = receipt_from_order(order)
     expense.vendor = receipt["vendor"] or expense.vendor
     expense.purchased_at = receipt["purchased_at"] or utcnow()
@@ -155,9 +163,7 @@ def complete_order(order_id: str, session: Session = Depends(get_session)):
         session.add(LineItem(expense_id=expense.id, name=it["name"], quantity=it["quantity"],
                              unit_amount=it["unit_amount"], amount=it["amount"]))
     session.commit()
-    result = agent.review(session, expense.id)
-    return {"expense_id": expense.id, "status": result["status"], "decision": result["decision"],
-            "engine": result["engine"], "question": result["question"]}
+    return agent.review(session, expense.id)
 
 
 def _held(session: Session, expense_id: int) -> Expense:

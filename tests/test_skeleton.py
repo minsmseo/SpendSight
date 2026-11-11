@@ -61,7 +61,7 @@ def test_pages_and_seed(client):
 
 def test_webhook_idempotent(client):
     event = {"id": "WH-TEST-1", "event_type": "PAYMENT.CAPTURE.COMPLETED", "resource": {}}
-    assert client.post("/webhooks/paypal", json=event).json() == {"ok": True, "verified": True}
+    assert client.post("/webhooks/paypal", json=event).json() == {"ok": True, "verified": True, "action": "no matching expense"}
     assert client.post("/webhooks/paypal", json=event).json() == {"ok": True, "duplicate": True}
 
 
