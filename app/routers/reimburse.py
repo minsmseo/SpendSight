@@ -15,8 +15,10 @@ router = APIRouter()
 
 
 @router.get("/reimburse")
-def reimburse_page(request: Request, session: Session = Depends(get_session)):
-    rows = list_rows(session, status="approved")
+def reimburse_page(request: Request, ids: str = "", session: Session = Depends(get_session)):
+    """`ids` (comma separated) narrows the list to the rows selected in the Finance queue."""
+    picked = [int(x) for x in ids.split(",") if x.strip().isdigit()] or None
+    rows = list_rows(session, status="approved", ids=picked)
     by_employee: dict[str, dict] = {}
     for r in rows:
         g = by_employee.setdefault(r["employee"], {"employee": r["employee"], "count": 0, "total": 0.0})

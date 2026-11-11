@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Confirm receipt · {{ app_name }}{% endblock %}
+{% block content %}
+{% macro weak(name) %}{{ "border-yellow-400 bg-yellow-50" if confidence.get(name, 1) < 0.6 else "border-slate-300" }}{% endmacro %}
+<h1 class="text-2xl font-semibold mb-1">Confirm receipt details</h1>
+<p class="text-sm text-slate-500 mb-6">
+  {% if fields %}Fields were read from the receipt ({{ extract_engine }}). Yellow fields are low confidence: please check them.
+  {% else %}Automatic reading is not available yet, so please fill in the fields from the receipt.{% endif %}
+</p>
+<div class="grid md:grid-cols-2 gap-6">
+  <section class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-3">Receipt</h2>
+    {% if is_pdf %}
+      <a class="text-indigo-600 underline text-sm" href="/uploads/{{ receipt_name }}" target="_blank">Open the uploaded PDF</a>
+    {% else %}
+      <img src="/uploads/{{ receipt_name }}" alt="Uploaded receipt" class="max-h-[32rem] rounded-lg border border-slate-200">
+    {% endif %}
+  </section>
+  <form method="post" action="/expenses/submit" class="bg-white rounded-xl border border-slate-200 p-5 text-sm space-y-3">
+    <input type="hidden" name="employee_id" value="{{ employee.id }}">
+    <input type="hidden" name="receipt_name" value="{{ receipt_name }}">
+    <input type="hidden" name="receipt_hash" value="{{ receipt_hash }}">
+    <div class="text-slate-500">Submitting as <b class="text-slate-800">{{ employee.name }}</b></div>
+    <label class="block">Vendor
+      <input name="vendor" required value="{{ fields.get('vendor') or '' }}" class="mt-1 w-full border rounded-lg px-3 py-1.5 {{ weak('vendor') }}"></label>
+    <div class="grid grid-cols-3 gap-3">
+      <label class="block">Date
+        <input type="date" name="purchased_on" required value="{{ fields.get('date') or today }}" class="mt-1 w-full border rounded-lg px-3 py-1.5 {{ weak('date') }}"></label>
+      <label class="block">Total (USD)
+        <input type="number" step="0.01" min="0.01" name="total" required value="{{ fields.get('total') or '' }}" class="mt-1 w-full border rounded-lg px-3 py-1.5 {{ weak('total') }}"></label>
+      <label class="block">Tax
+        <input type="number" step="0.01" min="0" name="tax_amount" value="{{ fields.get('tax') or 0 }}" class="mt-1 w-full border rounded-lg px-3 py-1.5 {{ weak('tax') }}"></label>
+    </div>
+    <label class="block">Items <span class="text-slate-400">(one per line: name, amount)</span>
+      <textarea name="items" rows="4" placeholder="Office coffee box, 34.00&#10;Assorted office snacks, 30.00" class="mt-1 w-full border rounded-lg px-3 py-1.5 font-mono {{ weak('items') }}">{% for it in fields.get('items') or [] %}{{ it.name }}, {{ "%.2f"|format(it.amount) }}
+{% endfor %}</textarea></label>
+    <label class="block">Business purpose
+      <textarea name="purpose" rows="2" placeholder="e.g. Snacks and coffee for the office" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5"></textarea></label>
+    <label class="block">Attendees <span class="text-slate-400">(optional)</span>
+      <input name="attendees" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5"></label>
+    <button class="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium">Submit for review</button>
+  </form>
+</div>
+{% endblock %}

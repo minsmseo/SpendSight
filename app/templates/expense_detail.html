@@ -1,45 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Expense #{{ e.id }} · {{ app_name }}{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>{% endblock %}
 {% block content %}
-<a href="/finance/queue" class="text-sm text-indigo-600">&larr; Back to queue</a>
-<div class="flex items-center gap-3 mt-2 mb-6">
+<div x-data="detail({{ e.id }})">
+{% if role == "finance" %}<a href="/finance/queue" class="text-sm text-indigo-600">&larr; Back to queue</a>
+{% else %}<a href="/employee?employee_id={{ e.employee_id }}" class="text-sm text-indigo-600">&larr; Back to my expenses</a>{% endif %}
+<div class="flex flex-wrap items-center gap-3 mt-2 mb-6">
   <h1 class="text-2xl font-semibold">{{ e.vendor }} · ${{ "%.2f"|format(e.total) }}</h1>
   <span class="chip chip-{{ e.status }}">{{ e.status.replace("_", " ") }}</span>
   {% if decision %}<span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span>{% endif %}
 </div>
+<p x-show="error" x-text="error" class="text-sm text-red-700 mb-4"></p>
+
 {% if e.status == "held" %}
-<div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-4" x-data="heldActions({{ e.id }})">
+<div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-4">
   <div class="text-sm text-orange-900 flex-1">
     <b>Held by {{ app_name }}, waiting for review.</b>
     PayPal has authorized ${{ "%.2f"|format(e.total) }} but nothing has been captured yet.
   </div>
   {% if role == "finance" %}
-  <button @click="act('capture-auth')" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">Approve and capture</button>
-  <button @click="act('void-auth')" :disabled="busy" class="border border-red-300 text-red-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">Reject and void</button>
+  <button @click="post('approve')" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">Approve and capture</button>
+  <button @click="post('reject')" :disabled="busy" class="border border-red-300 text-red-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">Reject and void</button>
   {% endif %}
-  <p x-show="error" x-text="error" class="text-sm text-red-700 w-full"></p>
 </div>
-<script>
-  function heldActions(id) {
-    return {
-      busy: false, error: "",
-      async act(action) {
-        this.busy = true; this.error = "";
-        const r = await fetch(`/api/expenses/${id}/${action}`, {method: "POST"});
-        if (r.ok) { window.location.reload(); return; }
-        this.error = (await r.json().catch(() => ({}))).detail || "Request failed";
-        this.busy = false;
-      },
-    };
-  }
-</script>
 {% endif %}
+
 <div class="grid md:grid-cols-2 gap-6">
   <section class="bg-white rounded-xl border border-slate-200 p-5">
-    <h2 class="font-semibold mb-3">Receipt ({{ e.source }})</h2>
+    <h2 class="font-semibold mb-3">Receipt ({{ {"paypal": "PayPal itemized receipt", "upload": "uploaded", "import": "PayPal import"}.get(e.source, e.source) }})</h2>
     <dl class="text-sm grid grid-cols-3 gap-y-1 mb-4">
       <dt class="text-slate-500">Employee</dt><dd class="col-span-2">{{ employee.name }} ({{ employee.role_title }})</dd>
-      <dt class="text-slate-500">Date</dt><dd class="col-span-2">{{ e.purchased_at.strftime("%Y-%m-%d %H:%M") if e.purchased_at else "—" }}</dd>
+      <dt class="text-slate-500">Date</dt><dd class="col-span-2">{{ local_time.strftime("%Y-%m-%d %H:%M %Z") if local_time else "—" }}</dd>
       <dt class="text-slate-500">Purpose</dt><dd class="col-span-2">{{ e.purpose or "—" }}</dd>
       <dt class="text-slate-500">Attendees</dt><dd class="col-span-2">{{ e.attendees or "—" }}</dd>
       {% if e.paypal_order_id %}<dt class="text-slate-500">PayPal order</dt><dd class="col-span-2 font-mono">{{ e.paypal_order_id }}</dd>{% endif %}
@@ -51,35 +42,128 @@
       <tbody>
       {% for li in items %}
         <tr class="border-b border-slate-100">
-          <td class="py-1">{{ li.name }}</td><td>{{ li.category }}</td>
+          <td class="py-1">{{ li.name }}</td><td>{{ li.category.replace("_", " ") }}</td>
           <td class="text-right">${{ "%.2f"|format(li.amount) }}</td>
-          <td class="text-right">{{ li.deductible_pct|int }}% · ${{ "%.2f"|format(li.deductible_amount) }}</td>
+          <td class="text-right">{{ li.deductible_pct|round(1)|string|replace(".0", "") }}% · ${{ "%.2f"|format(li.deductible_amount) }}</td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
+    {% if e.receipt_path %}
+      {% if e.receipt_path.endswith(".pdf") %}
+        <a class="inline-block mt-4 text-indigo-600 underline text-sm" href="/uploads/{{ e.receipt_path }}" target="_blank">Open receipt PDF</a>
+      {% else %}
+        <img src="/uploads/{{ e.receipt_path }}" alt="Receipt" class="mt-4 max-h-96 rounded-lg border border-slate-200">
+      {% endif %}
+    {% endif %}
   </section>
+
   <section class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold mb-3">Decision</h2>
     {% if decision %}
       <div class="grid grid-cols-2 gap-4 mb-4">
         <div class="rounded-lg bg-slate-50 p-3">
           <div class="text-xs text-slate-500">Reimbursable under policy?</div>
-          <div class="text-lg font-semibold">{{ "Yes" if decision.reimbursable else "No" }}</div>
+          <div class="text-lg font-semibold">
+            {% if e.status == "needs_info" %}Pending answer
+            {% elif e.status in ("approved", "paid") %}Yes
+            {% elif e.status == "rejected" %}No
+            {% else %}{{ "Yes, if Finance agrees" if decision.reimbursable else "No" }}{% endif %}
+          </div>
         </div>
         <div class="rounded-lg bg-slate-50 p-3">
           <div class="text-xs text-slate-500">Deductible for tax</div>
-          <div class="text-lg font-semibold">${{ "%.2f"|format(items|sum(attribute="deductible_amount")) }}</div>
+          <div class="text-lg font-semibold">${{ "%.2f"|format(items|sum(attribute="deductible_amount")) }} <span class="text-sm font-normal text-slate-500">of ${{ "%.2f"|format(items|sum(attribute="amount")) }}</span></div>
         </div>
       </div>
+      <div class="text-xs text-slate-500 mb-1">Why <span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span> · fit score {{ "%.2f"|format(decision.fit_score) }}</div>
       <ul class="text-sm list-disc ml-5 space-y-1">{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul>
-      {% if decision.question %}<p class="mt-3 text-sm bg-yellow-50 border border-yellow-200 rounded-lg p-3">Agent question: {{ decision.question }}</p>{% endif %}
-      {% if missing %}<p class="mt-3 text-sm text-orange-700">Missing: {{ missing|join(", ") }}</p>{% endif %}
-      {% for a in anomalies %}<p class="mt-2 text-sm text-red-700">⚠ {{ a.explanation }}</p>{% endfor %}
+      {% if missing %}<p class="mt-3 text-sm text-orange-700">Missing substantiation: {{ missing|join(", ")|replace("_", " ") }}</p>{% endif %}
+      {% for a in anomalies %}<p class="mt-2 text-sm {{ 'text-slate-500' if a.severity == 'low' else 'text-red-700' }}">⚠ {{ a.explanation }}</p>{% endfor %}
+      {% if finance and finance.id > decision.id %}
+        <p class="mt-4 text-sm bg-indigo-50 border border-indigo-200 rounded-lg p-3"><b>Finance: {{ finance.decision.replace("_", " ") }}.</b> {{ finance_note }}</p>
+      {% endif %}
     {% else %}
       <p class="text-sm text-slate-500">Not reviewed yet.</p>
     {% endif %}
-    <p class="mt-6 text-xs text-slate-400">Coming next: follow-up thread, control chart, approve / reject / ask.</p>
+
+    {% if role == "finance" and e.status in ("flagged", "needs_info", "approved", "rejected") %}
+    <div class="mt-5 pt-4 border-t border-slate-100">
+      <div class="flex flex-wrap gap-2 mb-3">
+        {% if e.status != "approved" %}<button @click="post('approve', {note})" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-1.5 text-sm disabled:opacity-50">Approve</button>{% endif %}
+        {% if e.status != "rejected" %}<button @click="post('reject', {note})" :disabled="busy" class="border border-red-300 text-red-700 rounded-lg px-4 py-1.5 text-sm disabled:opacity-50">Reject</button>{% endif %}
+        <input x-model="note" placeholder="Note (optional)" class="flex-1 min-w-40 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">
+      </div>
+      <div class="flex gap-2">
+        <input x-model="question" @keydown.enter="post('ask', {question})" placeholder="Ask the employee a question" class="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">
+        <button @click="post('ask', {question})" :disabled="busy || !question.trim()" class="border border-slate-300 rounded-lg px-4 py-1.5 text-sm disabled:opacity-50">Ask</button>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  {% if followups %}
+  <section class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-3">Follow-up</h2>
+    <div class="space-y-3 text-sm">
+      {% for f in followups %}
+      <div>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mr-8">{{ f.question }}</div>
+        {% if f.answer %}
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 ml-8 mt-2">{{ f.answer }}</div>
+        {% else %}
+          <div class="flex gap-2 ml-8 mt-2">
+            <input x-model="answer" @keydown.enter="post('answer', {answer})" placeholder="Answer as {{ employee.name }}" class="flex-1 border border-slate-300 rounded-lg px-3 py-1.5">
+            <button @click="post('answer', {answer})" :disabled="busy || !answer.trim()" class="bg-indigo-600 text-white rounded-lg px-3 py-1.5 disabled:opacity-50">Answer</button>
+          </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="bg-white rounded-xl border border-slate-200 p-5 {{ '' if followups else 'md:col-span-2' }}">
+    <h2 class="font-semibold mb-1">Control chart</h2>
+    <p class="text-xs text-slate-500 mb-3" x-text="chartNote"></p>
+    <div class="h-56" x-show="hasChart"><canvas id="spc"></canvas></div>
   </section>
 </div>
+</div>
+<script>
+  function detail(id) {
+    return {
+      busy: false, error: "", note: "", question: "", answer: "", hasChart: false, chartNote: "Loading…",
+      async post(action, body) {
+        this.busy = true; this.error = "";
+        const r = await fetch(`/api/expenses/${id}/${action}`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+        if (r.ok) { window.location.reload(); return; }
+        this.error = (await r.json().catch(() => ({}))).detail || "Request failed";
+        this.busy = false;
+      },
+      async init() {
+        const s = await (await fetch(`/api/expenses/${id}/chart`)).json();
+        const label = (s.category || "").replace("_", " ");
+        if (!s.points.length) { this.chartNote = `Not enough ${label} history for a control chart (needs 8 purchases).`; return; }
+        this.hasChart = true;
+        this.chartNote = `${label} purchases for ${s.scope}. Red point is this expense; dashed lines are mean, +2 sigma and +3 sigma.`;
+        const labels = [...s.points.map(p => p.date), s.current.date || "now"];
+        const flat = v => labels.map(() => v);
+        const line = (label, v, color) => ({label, data: flat(v), borderColor: color, borderDash: [6, 4], borderWidth: 1, pointRadius: 0});
+        await this.$nextTick();
+        new Chart(document.getElementById("spc"), {
+          type: "line",
+          data: {labels, datasets: [
+            {label: "Amount", data: [...s.points.map(p => p.amount), s.current.amount], borderColor: "#6366f1", borderWidth: 1.5, tension: 0,
+             pointRadius: labels.map((_, i) => i === labels.length - 1 ? 6 : 2),
+             pointBackgroundColor: labels.map((_, i) => i === labels.length - 1 ? "#dc2626" : "#6366f1")},
+            line("Mean", s.mean, "#64748b"), line("+2σ", s.ucl2, "#f59e0b"), line("+3σ", s.ucl3, "#dc2626"),
+          ]},
+          options: {maintainAspectRatio: false, plugins: {legend: {position: "bottom", labels: {boxWidth: 12}}},
+                    scales: {x: {ticks: {maxTicksLimit: 8}}, y: {ticks: {callback: v => "$" + v}}}},
+        });
+      },
+    };
+  }
+</script>
 {% endblock %}

@@ -6,37 +6,115 @@
 <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
 {% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-semibold">Finance queue</h1>
-  <input id="quick" placeholder="Search…" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-64">
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-2xl font-semibold mr-auto">Finance queue</h1>
+  <label class="text-sm text-slate-500">Group by
+    <select id="groupBy" class="border border-slate-300 rounded-lg px-2 py-1.5 text-slate-800">
+      <option value="">None</option><option value="employee">Employee</option><option value="category">Category</option>
+    </select>
+  </label>
+  <input id="quick" placeholder="Search…" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-56">
 </div>
-<div id="grid" class="ag-theme-quartz" style="height: 70vh"></div>
+<div id="statusBar" class="flex flex-wrap gap-2 mb-3 text-sm"></div>
+<div id="grid" class="ag-theme-quartz" style="height: 62vh"></div>
+<div class="flex items-center gap-4 mt-4 text-sm">
+  <span id="selInfo" class="text-slate-500">Select approved expenses to reimburse.</span>
+  <a id="payBtn" href="#" class="hidden bg-indigo-600 text-white rounded-lg px-4 py-2">Pay via PayPal</a>
+  <span id="msg" class="text-red-700"></span>
+</div>
 <script>
-  const usd = p => p.value == null ? "" : "$" + Number(p.value).toFixed(2);
+  const CATEGORIES = {{ categories|tojson }};
+  const STATUSES = ["needs_info", "flagged", "held", "approved", "rejected", "paid"];
+  const usd = v => "$" + Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const money = p => p.value == null ? "" : usd(p.value);
   const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const sourceLabel = {paypal: "PayPal", upload: "Receipt", import: "Import"};
-  const gridOptions = {
-    columnDefs: [
-      {field: "status", width: 130, filter: true, cellRenderer: p => chip("chip-" + p.value, p.value.replace("_", " "))},
-      {field: "employee", filter: true, width: 150},
-      {field: "vendor", filter: true, flex: 1, minWidth: 170,
-       cellRenderer: p => `<a class="text-indigo-600 hover:underline" href="/expenses/${p.data.id}">${p.value}</a>`},
-      {field: "purchased_at", headerName: "Date", width: 120, valueFormatter: p => (p.value || "").slice(0, 10), sort: "desc"},
-      {field: "category", filter: true, width: 150},
-      {field: "total", width: 110, type: "rightAligned", valueFormatter: usd},
-      {field: "reimbursable", width: 130, valueFormatter: p => p.value == null ? "" : (p.value ? "Yes" : "No")},
-      {field: "deductible_amount", headerName: "Deductible", width: 120, type: "rightAligned", valueFormatter: usd},
-      {field: "engine", width: 100, cellRenderer: p => p.value ? chip("badge-" + p.value, p.value) : ""},
-      {field: "anomalies", headerName: "⚠", width: 70, valueFormatter: p => p.value ? "⚠ " + p.value : ""},
-      {field: "source", width: 100, valueFormatter: p => sourceLabel[p.value] || p.value},
-    ],
-    defaultColDef: {sortable: true, resizable: true},
-    rowSelection: "multiple",
+  let rows = [], statusFilter = "", groupBy = "";
+
+  const columnDefs = () => [
+    {field: "status", width: 140, filter: true,
+     cellRenderer: p => chip("chip-" + p.value, p.value.replace("_", " ")) + (p.data.finance ? ' <span title="Decided by Finance">👤</span>' : "")},
+    {field: "employee", filter: true, width: 150},
+    {field: "vendor", filter: true, flex: 1, minWidth: 170,
+     cellRenderer: p => `<a class="text-indigo-600 hover:underline" href="/expenses/${p.data.id}">${esc(p.value)}</a>`},
+    {field: "purchased_at", headerName: "Date", width: 120, valueFormatter: p => (p.value || "").slice(0, 10)},
+    {field: "category", filter: true, width: 160, editable: p => !["paid"].includes(p.data.status),
+     cellEditor: "agSelectCellEditor", cellEditorParams: {values: CATEGORIES},
+     headerTooltip: "Double-click a cell to correct the category"},
+    {field: "total", width: 110, type: "rightAligned", valueFormatter: money},
+    {field: "reimbursable", width: 130, valueFormatter: p => p.value == null ? "" : (p.value ? "Yes" : "No")},
+    {field: "deductible_amount", headerName: "Deductible", width: 120, type: "rightAligned", valueFormatter: money},
+    {field: "engine", width: 100, cellRenderer: p => p.value ? chip("badge-" + p.value, p.value) : ""},
+    {field: "anomalies", headerName: "⚠", width: 70, valueFormatter: p => p.value ? "⚠ " + p.value : ""},
+    {field: "source", width: 100, valueFormatter: p => sourceLabel[p.value] || p.value},
+  ].map(c => ({...c, sortable: !groupBy}));
+
+  // AG Grid Community has no row grouping, so group headers are full-width rows.
+  function buildRows() {
+    if (!groupBy) return [...rows].sort((a, b) => (b.purchased_at || "").localeCompare(a.purchased_at || ""));
+    const visible = rows.filter(r => !statusFilter || r.status === statusFilter);
+    const groups = {};
+    visible.forEach(r => (groups[r[groupBy] || "(none)"] ||= []).push(r));
+    return Object.keys(groups).sort().flatMap(key => [
+      {__group: key, count: groups[key].length, total: groups[key].reduce((s, r) => s + r.total, 0)},
+      ...groups[key],
+    ]);
+  }
+
+  const gridApi = agGrid.createGrid(document.getElementById("grid"), {
+    columnDefs: columnDefs(),
+    defaultColDef: {resizable: true},
+    rowSelection: {mode: "multiRow", enableClickSelection: false, isRowSelectable: n => !!n.data && n.data.status === "approved"},
+    isFullWidthRow: p => !!p.rowNode.data?.__group,
+    fullWidthCellRenderer: p => `<div class="px-4 h-full flex items-center gap-4 bg-slate-100 font-semibold">${esc(p.data.__group)}<span class="font-normal text-slate-500">${p.data.count} expenses · ${usd(p.data.total)}</span></div>`,
+    isExternalFilterPresent: () => !!statusFilter,
+    doesExternalFilterPass: n => !!n.data.__group || n.data.status === statusFilter,
     pagination: true,
     paginationPageSize: 50,
-  };
-  const api = agGrid.createGrid(document.getElementById("grid"), gridOptions);
-  fetch("/api/expenses").then(r => r.json()).then(rows => api.setGridOption("rowData", rows));
-  document.getElementById("quick").addEventListener("input", e => api.setGridOption("quickFilterText", e.target.value));
+    onSelectionChanged: updateSelection,
+    onCellValueChanged: async e => {
+      if (e.colDef.field !== "category" || e.newValue === e.oldValue) return;
+      const r = await fetch(`/api/expenses/${e.data.id}/category`, {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({category: e.newValue})});
+      document.getElementById("msg").textContent = r.ok ? "" : ((await r.json().catch(() => ({}))).detail || "Could not change the category");
+      await load();
+    },
+  });
+
+  function renderStatusBar() {
+    const counts = Object.fromEntries(STATUSES.map(s => [s, rows.filter(r => r.status === s).length]));
+    const btn = (value, label, n) => `<button data-status="${value}" class="rounded-full px-3 py-1 border ${statusFilter === value ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-300"}">${label} <span class="opacity-70">${n}</span></button>`;
+    document.getElementById("statusBar").innerHTML = btn("", "All", rows.length) + STATUSES.map(s => btn(s, s.replace("_", " "), counts[s])).join("");
+  }
+
+  function updateSelection() {
+    const picked = gridApi.getSelectedRows().filter(r => !r.__group);
+    const total = picked.reduce((s, r) => s + r.total, 0);
+    document.getElementById("selInfo").textContent = picked.length ? `${picked.length} selected · ${usd(total)}` : "Select approved expenses to reimburse.";
+    const pay = document.getElementById("payBtn");
+    pay.classList.toggle("hidden", !picked.length);
+    pay.href = "/reimburse?ids=" + picked.map(r => r.id).join(",");
+  }
+
+  function refresh() {
+    gridApi.setGridOption("columnDefs", columnDefs());
+    gridApi.setGridOption("rowData", buildRows());
+    gridApi.onFilterChanged();
+    renderStatusBar();
+    updateSelection();
+  }
+
+  async function load() {
+    rows = await (await fetch("/api/expenses")).json();
+    refresh();
+  }
+
+  document.getElementById("statusBar").addEventListener("click", e => {
+    const b = e.target.closest("button[data-status]");
+    if (b) { statusFilter = b.dataset.status; refresh(); }
+  });
+  document.getElementById("groupBy").addEventListener("change", e => { groupBy = e.target.value; refresh(); });
+  document.getElementById("quick").addEventListener("input", e => gridApi.setGridOption("quickFilterText", e.target.value));
+  load();
 </script>
 {% endblock %}

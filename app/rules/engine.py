@@ -133,7 +133,7 @@ def _count_people(attendees: str) -> int:
 
 # --- the pipeline -----------------------------------------------------------
 def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), anomaly_fn=None,
-             now: datetime | None = None, trust_existing_categories: bool = False) -> dict:
+             now: datetime | None = None) -> dict:
     """Pure decision function. `expense` / `items` / `followups` are model-like objects.
 
     anomaly_fn(primary_category, per_txn_limit) -> [{rule, severity, explanation}] is called after
@@ -154,10 +154,11 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
         attendees = " ".join(f.answer.strip() for f in answered if f.question in attendee_qs)
     purpose = " ".join([(expense.purpose or "").strip()] + [f.answer.strip() for f in answered]).strip()
 
-    # 2. Categorize lines.
+    # 2. Categorize lines. A category that is already set (earlier review, Finance edit in the
+    #    grid) is kept, so a manual correction survives later re-reviews.
     lines = []
     for it in items:
-        if trust_existing_categories and it.category in cats:
+        if it.category in cats:
             category = it.category
         else:
             category, _ = categorize(it.name, expense.vendor or "")
@@ -349,7 +350,7 @@ def apply_result(session, expense, result: dict) -> dict:
     return result
 
 
-def review_expense(session, expense_id: int, trust_existing_categories: bool = False) -> dict:
+def review_expense(session, expense_id: int) -> dict:
     """Run the rules pipeline on a stored expense and persist the result."""
     from sqlmodel import select
 
@@ -365,7 +366,7 @@ def review_expense(session, expense_id: int, trust_existing_categories: bool = F
     followups = session.exec(select(FollowUp).where(FollowUp.expense_id == expense_id)).all()
     result = evaluate(
         expense=expense, items=items, industry_id=company.industry_id, policy=policy,
-        followups=followups, trust_existing_categories=trust_existing_categories,
+        followups=followups,
         anomaly_fn=lambda category, limit: spc.check(session, expense, category, limit, len(items)),
     )
     return apply_result(session, expense, result)
