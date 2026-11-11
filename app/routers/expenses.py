@@ -81,6 +81,16 @@ def api_expenses(
     return list_rows(session, employee_id, status)
 
 
+@router.post("/api/expenses/{expense_id}/review")
+def api_review(expense_id: int, session: Session = Depends(get_session)):
+    """(Re)run the review pipeline: LLM agent when available, rule engine otherwise."""
+    from app.ai import agent
+
+    if not session.get(Expense, expense_id):
+        raise HTTPException(404, "Expense not found")
+    return agent.review(session, expense_id)
+
+
 @router.get("/expenses/{expense_id}")
 def expense_detail(expense_id: int, request: Request, session: Session = Depends(get_session)):
     e = session.get(Expense, expense_id)

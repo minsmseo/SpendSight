@@ -147,7 +147,7 @@
       "meal_rule": null
     },
     "operations": {
-      "keywords": ["subscription", "license", "tooling", "supplies", "equipment", "campaign", "ads", "hosting", "upgrade", "replacement", "workstation"],
+      "keywords": ["subscription", "license", "tooling", "supplies", "equipment", "campaign", "ads", "hosting", "upgrade", "replacement", "workstation", "accessories", "new hire", "onboarding", "shipping", "inventory"],
       "fits_categories": ["software", "office_supplies", "advertising", "shipping", "fuel", "tools_equipment", "inventory"],
       "meal_rule": null
     },

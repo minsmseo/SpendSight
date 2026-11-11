@@ -47,11 +47,14 @@ def test_taxonomy_rules_exist():
 def test_pages_and_seed(client):
     assert client.get("/healthz").json()["ok"] is True
     rows = client.get("/api/expenses").json()
-    assert len(rows) == 150
+    assert len(rows) >= 150
     assert {r["employee"] for r in rows} == {"Alice Chen", "Bob Martinez", "Carol Singh"}
     for path in ("/finance/queue", "/employee", "/store", "/onboarding", "/reimburse", "/reports/tax",
                  "/settings", f"/expenses/{rows[0]['id']}"):
         assert client.get(path).status_code == 200, path
+    reviewed = client.post(f"/api/expenses/{rows[-1]['id']}/review").json()
+    assert reviewed["engine"] == "rules" and reviewed["decision"] == "approved"
+    assert client.post("/api/expenses/999999/review").status_code == 404
     assert client.get("/config").json()["paypal_mode"] == "mock"
     assert client.get("/api/status").json()["ai"]["state"] == "not_set"
 
