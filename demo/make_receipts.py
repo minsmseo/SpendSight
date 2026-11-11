@@ -1,4 +1,5 @@
 """Render demo receipt images with Pillow into demo/receipts/.  Run: python demo/make_receipts.py"""
+from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -12,6 +13,7 @@ RECEIPTS = {
 }
 
 
+@lru_cache
 def _font(size: int):
     for name in ("consola.ttf", "DejaVuSansMono.ttf", "cour.ttf"):
         try:
@@ -21,7 +23,7 @@ def _font(size: int):
     return ImageFont.load_default()
 
 
-def render(name: str, vendor: str, when: str, items: list[tuple[str, float]], tax: float) -> Path:
+def render(name: str, vendor: str, when: str, items: list[tuple[str, float]], tax: float, out_dir: Path = OUT) -> Path:
     font, big = _font(22), _font(30)
     img = Image.new("RGB", (640, 300 + 34 * len(items)), "white")
     d = ImageDraw.Draw(img)
@@ -36,8 +38,8 @@ def render(name: str, vendor: str, when: str, items: list[tuple[str, float]], ta
     for label, value in (("SUBTOTAL", subtotal), ("SALES TAX", tax), ("TOTAL", subtotal + tax)):
         d.text((40, y), label, font=font, fill="black")
         d.text((500, y), f"${value:.2f}", font=font, fill="black"); y += 34
-    OUT.mkdir(exist_ok=True)
-    path = OUT / name
+    out_dir.mkdir(exist_ok=True)
+    path = out_dir / name
     img.save(path)
     return path
 

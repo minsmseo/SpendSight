@@ -18,7 +18,7 @@
       <div class="flex flex-wrap items-baseline gap-3 mb-1">
         <span class="font-semibold">{{ g.employee }}</span>
         <span class="text-xs text-slate-500 font-mono">{{ g.paypal_email }}</span>
-        <span class="ml-auto font-mono font-semibold">${{ "{:,.2f}".format(g.total) }}</span>
+        <span class="ml-auto font-mono font-semibold">{{ (g.total)|usd }}</span>
       </div>
       <table class="w-full text-sm">
         <tbody>
@@ -29,7 +29,7 @@
             <td class="text-slate-500">{{ (r.purchased_at or "")[:10] }}</td>
             <td class="text-slate-500">{{ r.category.replace("_", " ") }}</td>
             <td>{% if r.late_days %}<span class="chip chip-flagged" title="Accountable plan, Reg. §1.62-2">substantiated after {{ r.late_days }} days: may be taxable to the employee</span>{% endif %}</td>
-            <td class="text-right font-mono">${{ "%.2f"|format(r.total) }}</td>
+            <td class="text-right font-mono">{{ (r.total)|usd }}</td>
           </tr>
         {% endfor %}
         </tbody>
@@ -39,7 +39,7 @@
   </div>
   <div class="flex flex-wrap items-center gap-4 mt-5 pt-4 border-t border-slate-200">
     <button @click="send()" :disabled="busy || sent" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50">Send PayPal Payouts</button>
-    <span class="text-sm">{{ expense_ids|length }} expenses · {{ groups|length }} employees · <b class="font-mono">${{ "{:,.2f}".format(grand_total) }}</b></span>
+    <span class="text-sm">{{ expense_ids|length }} expenses · {{ groups|length }} employees · <b class="font-mono">{{ (grand_total)|usd }}</b></span>
     <span x-show="error" x-text="error" class="text-sm text-red-700"></span>
   </div>
   {% else %}

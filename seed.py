@@ -45,6 +45,21 @@ PATTERNS = [
 ]
 
 
+def _seed_receipt(expense_id: int, vendor: str, when: datetime, item_name: str, amount: float) -> str | None:
+    """Render a receipt image that matches the seeded expense, so history looks like real uploads."""
+    try:
+        from app import config
+        from demo.make_receipts import render
+
+        config.UPLOAD_DIR.mkdir(exist_ok=True)
+        name = f"seed-{expense_id}.png"
+        render(name, vendor.upper(), rules.to_local(when).strftime("%m/%d/%Y %I:%M %p"), [(item_name, amount)], 0.0,
+               out_dir=config.UPLOAD_DIR)
+        return name
+    except Exception:
+        return None                                    # no Pillow / read-only disk: seed still works
+
+
 def _add_expense(session: Session, rng: random.Random, emp: Employee, when: datetime, now: datetime) -> None:
     idx = emp.id - 1
     pattern = rng.choices(PATTERNS, weights=[p[8][idx % 3] for p in PATTERNS])[0]
@@ -63,6 +78,8 @@ def _add_expense(session: Session, rng: random.Random, emp: Employee, when: date
     )
     session.add(exp)
     session.flush()
+    if source == "upload" and exp.id % 9:              # every 9th upload has no receipt: feeds the "Missing" list
+        exp.receipt_path = _seed_receipt(exp.id, vendor, when, item_name, amount)
     session.add(LineItem(
         expense_id=exp.id, name=item_name, quantity=1, unit_amount=amount, amount=amount, category=category,
         deductible_pct=pct, deductible_amount=round(amount * pct / 100, 2),
@@ -95,7 +112,8 @@ def seed(session: Session, days: int = 90, rows: int = 150) -> None:
         day = now - timedelta(days=rng.randint(2, days))
         while day.weekday() >= 5:                      # history is weekdays, business hours
             day -= timedelta(days=1)
-        when = day.replace(hour=rng.randint(9, 19), minute=rng.choice((0, 10, 25, 40, 55)))
+        # 17:00-03:00 UTC = 9am-7pm Pacific, so seeded purchases fall in local business hours.
+        when = day.replace(hour=0, minute=rng.choice((0, 10, 25, 40, 55))) + timedelta(hours=rng.randint(9, 19) + 8)
         _add_expense(session, rng, emp, when, now)
     session.commit()
 

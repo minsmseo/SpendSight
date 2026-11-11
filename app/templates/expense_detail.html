@@ -6,7 +6,7 @@
 {% if role == "finance" %}<a href="/finance/queue" class="text-sm text-indigo-600">&larr; Back to queue</a>
 {% else %}<a href="/employee?employee_id={{ e.employee_id }}" class="text-sm text-indigo-600">&larr; Back to my expenses</a>{% endif %}
 <div class="flex flex-wrap items-center gap-3 mt-2 mb-6">
-  <h1 class="text-2xl font-semibold">{{ e.vendor }} · ${{ "%.2f"|format(e.total) }}</h1>
+  <h1 class="text-2xl font-semibold">{{ e.vendor }} · {{ (e.total)|usd }}</h1>
   <span class="chip chip-{{ e.status }}">{{ e.status.replace("_", " ") }}</span>
   {% if decision %}<span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span>{% endif %}
 </div>
@@ -16,7 +16,7 @@
 <div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-4">
   <div class="text-sm text-orange-900 flex-1">
     <b>Held by {{ app_name }}, waiting for review.</b>
-    PayPal has authorized ${{ "%.2f"|format(e.total) }} but nothing has been captured yet.
+    PayPal has authorized {{ (e.total)|usd }} but nothing has been captured yet.
   </div>
   {% if role == "finance" %}
   <button @click="post('approve')" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">Approve and capture</button>
@@ -43,8 +43,8 @@
       {% for li in items %}
         <tr class="border-b border-slate-100">
           <td class="py-1">{{ li.name }}</td><td>{{ li.category.replace("_", " ") }}</td>
-          <td class="text-right">${{ "%.2f"|format(li.amount) }}</td>
-          <td class="text-right">{{ li.deductible_pct|round(1)|string|replace(".0", "") }}% · ${{ "%.2f"|format(li.deductible_amount) }}</td>
+          <td class="text-right">{{ (li.amount)|usd }}</td>
+          <td class="text-right">{{ li.deductible_pct|round(1)|string|replace(".0", "") }}% · {{ (li.deductible_amount)|usd }}</td>
         </tr>
       {% endfor %}
       </tbody>
@@ -73,7 +73,7 @@
         </div>
         <div class="rounded-lg bg-slate-50 p-3">
           <div class="text-xs text-slate-500">Deductible for tax</div>
-          <div class="text-lg font-semibold">${{ "%.2f"|format(items|sum(attribute="deductible_amount")) }} <span class="text-sm font-normal text-slate-500">of ${{ "%.2f"|format(items|sum(attribute="amount")) }}</span></div>
+          <div class="text-lg font-semibold">{{ (items|sum(attribute="deductible_amount"))|usd }} <span class="text-sm font-normal text-slate-500">of {{ (items|sum(attribute="amount"))|usd }}</span></div>
         </div>
       </div>
       <div class="text-xs text-slate-500 mb-1">Why <span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span> · fit score {{ "%.2f"|format(decision.fit_score) }}</div>

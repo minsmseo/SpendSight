@@ -7,6 +7,18 @@ from app.ai import provider as ai_provider
 
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "templates"))
 
+
+
+def usd(value) -> str:
+    """$1,234.50 (negative as -$5.00); empty for None."""
+    if value is None or value == "":
+        return ""
+    value = float(value)
+    return f"{'-' if value < 0 else ''}${abs(value):,.2f}"
+
+
+templates.env.filters["usd"] = usd
+
 ROLES = ("employee", "finance")
 
 
