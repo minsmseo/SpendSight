@@ -4,8 +4,8 @@
 {% macro weak(name) %}{{ "border-yellow-400 bg-yellow-50" if confidence.get(name, 1) < 0.6 else "border-slate-300" }}{% endmacro %}
 <h1 class="text-2xl font-semibold mb-1">Confirm receipt details</h1>
 <p class="text-sm text-slate-500 mb-6">
-  {% if fields %}Fields were read from the receipt ({{ extract_engine }}). Yellow fields are low confidence: please check them.
-  {% else %}Automatic reading is not available yet, so please fill in the fields from the receipt.{% endif %}
+  {% if fields %}Fields were read from the receipt by <span class="chip {{ 'badge-llm' if extract_engine == 'llm' else 'badge-rules' }}">{{ "AI vision" if extract_engine == "llm" else "OCR + rules" }}</span>. Yellow fields are low confidence: please check them.
+  {% else %}The receipt could not be read automatically (no AI key and no OCR engine available), so please fill in the fields from the receipt.{% endif %}
 </p>
 <div class="grid md:grid-cols-2 gap-6">
   <section class="bg-white rounded-xl border border-slate-200 p-5">

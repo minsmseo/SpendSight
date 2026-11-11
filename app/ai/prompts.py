@@ -46,5 +46,19 @@ VISION_RECEIPT = """Read this receipt and return its contents.
 
 Use an empty string for text you cannot read and 0 for a number you cannot read. Do not guess."""
 
-POLICY_SUMMARY = """Summarize this expense policy in 6 to 8 plain sentences and extract a policy table:
-rows of {category, per_txn_limit, preapproval_above, receipt_required_above, banned, notes}."""
+POLICY_SYSTEM = """You turn a company's expense policy document into a short summary and a rule table
+that an expense-review system will enforce, so accuracy matters more than coverage.
+
+- summary: 6 to 8 plain sentences covering what is reimbursable, the main limits, pre-approval,
+  receipt rules and what is banned. Finance staff read it to confirm the table is right.
+- rows: one row per expense category the document gives rules for. per_txn_limit is the most that
+  one purchase may cost; preapproval_above is the amount above which approval is needed before
+  buying; receipt_required_above is the amount from which a receipt is required. Use 0 when the
+  document states no such number for that category. Put nightly or daily rates (for example
+  "$350 per night") in notes, not in per_txn_limit, because they are not per-purchase limits.
+- banned: true only when the document says the whole category is not reimbursable.
+- preapproval_threshold and receipt_required_above at the top level are the company-wide numbers.
+- banned_items: short singular item names the document says are not reimbursable, such as
+  "gym membership".
+
+Use only numbers that appear in the document. Do not invent limits."""

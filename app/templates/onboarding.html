@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Onboarding · {{ app_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
+{% endblock %}
 {% block content %}
+{% set engine_label = {"llm": "AI", "local_model": "local model", "textrank": "TextRank", "lead": "lead sentences", "rules": "rules (regex)"} %}
 <h1 class="text-2xl font-semibold mb-6">Onboarding</h1>
 <form method="post" action="/onboarding/company" class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
   <h2 class="font-semibold mb-3">Company</h2>
@@ -20,18 +26,53 @@
     {% endfor %}
   </div>
 </form>
+
 <section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-  <h2 class="font-semibold mb-3">Expense policy</h2>
-  <p class="text-sm text-slate-500 mb-3">Pre-approval above ${{ policy.preapproval_threshold }}. Policy upload, summary and editable grid arrive in build step 6.</p>
-  <table class="w-full text-sm">
-    <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Category</th><th>Per-transaction limit</th><th>Pre-approval above</th><th>Receipt above</th><th>Banned</th><th>Notes</th></tr></thead>
-    <tbody>
-    {% for row in policy.rows %}
-      <tr class="border-b border-slate-100"><td class="py-1">{{ row.category }}</td><td>${{ row.per_txn_limit }}</td><td>${{ row.preapproval_above }}</td><td>${{ row.receipt_required_above }}</td><td>{{ "Yes" if row.banned else "" }}</td><td class="text-slate-500">{{ row.notes }}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+  <div class="flex flex-wrap items-center gap-3 mb-3">
+    <h2 class="font-semibold mr-auto">Expense policy</h2>
+    <form method="post" action="/onboarding/policy" enctype="multipart/form-data" class="flex items-center gap-2 text-sm">
+      <input type="file" name="policy_file" required accept=".pdf,.docx,.md,.txt,.markdown" class="max-w-56">
+      <button class="border border-indigo-600 text-indigo-600 rounded-lg px-3 py-1.5">Upload and analyze</button>
+    </form>
+  </div>
+  {% if error %}<p class="text-sm text-red-700 mb-3">{{ error }}</p>{% endif %}
+
+  {% if proposal %}
+  <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4 text-sm">
+    <div class="font-semibold mb-1">Proposed from {{ proposal.filename }} — not saved yet</div>
+    <div class="text-xs text-slate-500 mb-2">
+      Summary: <span class="chip {{ 'badge-llm' if proposal.summary_engine == 'llm' else 'badge-rules' }}">{{ engine_label.get(proposal.summary_engine, proposal.summary_engine) }}</span>
+      · Rule table: <span class="chip {{ 'badge-llm' if proposal.table_engine == 'llm' else 'badge-rules' }}">{{ engine_label.get(proposal.table_engine, proposal.table_engine) }}</span>
+    </div>
+    <p class="mb-2">{{ proposal.summary }}</p>
+    {% if proposal.found %}<p class="text-xs text-slate-500">Read from the document: {{ proposal.found|join("; ")|replace("_", " ") }}. Everything else keeps the default.</p>{% endif %}
+    {% if proposal.note %}<p class="text-xs text-orange-700 mt-1">{{ proposal.note }}</p>{% endif %}
+  </div>
+  {% elif company.policy_summary %}
+  <p class="text-sm text-slate-600 mb-4">{{ company.policy_summary }}</p>
+  {% endif %}
+
+  <div class="flex flex-wrap gap-4 items-end text-sm mb-3">
+    <label>Pre-approval above ($, any purchase)<br><input id="threshold" type="number" min="0" step="1" class="border border-slate-300 rounded-lg px-3 py-1.5 w-40"></label>
+    <label>Receipt required from ($)<br><input id="receiptFrom" type="number" min="0" step="1" class="border border-slate-300 rounded-lg px-3 py-1.5 w-40"></label>
+    <label class="flex-1 min-w-64">Banned items (comma separated)<br><input id="banned" class="border border-slate-300 rounded-lg px-3 py-1.5 w-full"></label>
+  </div>
+  <div id="policyGrid" class="ag-theme-quartz" style="height: 460px"></div>
+  <div class="flex flex-wrap items-center gap-3 mt-4 text-sm">
+    <button id="confirmBtn" class="bg-indigo-600 text-white rounded-lg px-4 py-2">{{ "Confirm policy" if proposal else "Save policy" }}</button>
+    <button id="defaultBtn" class="border border-slate-300 rounded-lg px-4 py-2">Load default policy</button>
+    <span class="text-slate-500">Double-click a cell to edit. Reviews use the saved table.</span>
+    <span id="policyMsg"></span>
+  </div>
 </section>
+
+<section class="bg-white rounded-xl border border-slate-200 p-5 mb-6 text-sm">
+  <h2 class="font-semibold mb-2">AI key (optional)</h2>
+  <p>Status: <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label }}</span>
+    <a href="/settings" class="text-indigo-600 underline ml-2">Set or test a key in Settings</a></p>
+  <p class="text-xs text-slate-400 mt-1">Without a key, receipts are read with OCR, policies with TextRank and regex, and decisions come from the rule engine.</p>
+</section>
+
 <section class="bg-white rounded-xl border border-slate-200 p-5">
   <h2 class="font-semibold mb-3">Employees</h2>
   <table class="w-full text-sm">
@@ -43,4 +84,48 @@
     </tbody>
   </table>
 </section>
+
+<script>
+  const POLICY = {{ (proposal.policy if proposal else policy)|tojson }};
+  const SUMMARY = {{ (proposal.summary if proposal else "")|tojson }};
+  const CATEGORIES = {{ categories|tojson }};
+  const money = p => p.value ? "$" + Number(p.value).toLocaleString("en-US") : "—";
+  const num = {editable: true, cellEditor: "agNumberCellEditor", cellEditorParams: {min: 0}, valueFormatter: money, type: "rightAligned", width: 170};
+  document.getElementById("threshold").value = POLICY.preapproval_threshold ?? 0;
+  document.getElementById("receiptFrom").value = POLICY.receipt_required_above ?? 0;
+  document.getElementById("banned").value = (POLICY.banned_items || []).join(", ");
+  const policyApi = agGrid.createGrid(document.getElementById("policyGrid"), {
+    rowData: POLICY.rows.map(r => ({...r})),
+    columnDefs: [
+      {field: "category", editable: true, cellEditor: "agSelectCellEditor", cellEditorParams: {values: CATEGORIES}, width: 170,
+       valueFormatter: p => (p.value || "").replace("_", " ")},
+      {field: "per_txn_limit", headerName: "Per-transaction limit", ...num},
+      {field: "preapproval_above", headerName: "Pre-approval above", ...num},
+      {field: "receipt_required_above", headerName: "Receipt required above", ...num},
+      {field: "banned", editable: true, width: 100, cellDataType: "boolean"},
+      {field: "notes", editable: true, flex: 1, minWidth: 220},
+    ],
+    defaultColDef: {resizable: true, sortable: true},
+    stopEditingWhenCellsLoseFocus: true,
+  });
+  const msg = (text, ok) => { const el = document.getElementById("policyMsg"); el.textContent = text; el.className = ok ? "text-green-700" : "text-red-700"; };
+  document.getElementById("confirmBtn").addEventListener("click", async () => {
+    policyApi.stopEditing();
+    const rows = [];
+    policyApi.forEachNode(n => rows.push(n.data));
+    const policy = {
+      preapproval_threshold: Number(document.getElementById("threshold").value || 0),
+      receipt_required_above: Number(document.getElementById("receiptFrom").value || 0),
+      banned_items: document.getElementById("banned").value.split(",").map(s => s.trim()).filter(Boolean),
+      rows,
+    };
+    const r = await fetch("/api/onboarding/policy", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({policy, summary: SUMMARY})});
+    if (r.ok) { msg("Saved. New reviews use this policy.", true); setTimeout(() => window.location = "/onboarding", 900); }
+    else msg((await r.json().catch(() => ({}))).detail || "Could not save the policy", false);
+  });
+  document.getElementById("defaultBtn").addEventListener("click", async () => {
+    const r = await fetch("/api/onboarding/policy/default", {method: "POST"});
+    if (r.ok) window.location = "/onboarding"; else msg("Could not load the default policy", false);
+  });
+</script>
 {% endblock %}
