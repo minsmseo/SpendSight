@@ -6,7 +6,9 @@ is it *reimbursable under company policy*, and *how much is tax deductible under
 - Demo video: _to be added before submission_
 - Hosted demo: _to be added after the Render deploy_
 
-![Finance queue](docs/screenshot.jpg)
+![Dashboard](docs/screenshot.jpg)
+
+![Review queue](docs/queue.jpg)
 
 ## The problem
 
@@ -31,6 +33,10 @@ SpendSight is for finance teams at US C corporations and for the CPA who closes 
 5. **Reimburse.** Approved expenses go out in one PayPal Payouts batch, one payment per employee.
 6. **Close.** The tax report shows deductible and nondeductible amounts by category and Form 1120
    line, lists missing substantiation, and exports a CPA package (XLSX, CSV).
+
+The Finance **dashboard** shows where every submitted dollar ends up (deductible, nondeductible, under
+review, not reimbursable), what needs a decision, and a **Confirm with your CPA** list: accepted expenses
+whose tax treatment depends on a judgment call, each with the reason to check it.
 
 Every decision shows which engine produced it (`llm` or `rules`) and a plain one-sentence reason.
 
@@ -189,7 +195,7 @@ marked `verify_with_cpa`.
 
 ## Sponsor tools
 
-- **AG Grid Community**: the Finance queue (status filters, grouping, row selection for payouts,
+- **AG Grid Community**: the review queue (status filters, grouping, row selection for payouts,
   inline category edits) and the editable policy table in onboarding.
 - **Render**: Docker web service defined in `render.yaml`.
 

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block crumb %}{{ d.company }} · C corporation (Form 1120) · {{ d.industry }}{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>{% endblock %}
+{% block content %}
+{% set series = {"deductible": "var(--series-1)", "nondeductible": "var(--series-2)", "review": "var(--series-3)", "rejected": "var(--series-4)"} %}
+<div class="flex flex-wrap items-end gap-4 mb-6">
+  <div class="mr-auto">
+    <h1 class="text-2xl font-semibold">Dashboard</h1>
+    <p class="page-sub">Where every submitted dollar ends up, what needs a decision, and what to confirm with your CPA.</p>
+  </div>
+  <form method="get">
+    <select name="period" onchange="this.form.submit()" aria-label="Period" class="border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+      {% for o in d.options %}<option value="{{ o.value }}" {{ "selected" if o.value == d.period }}>{{ o.label }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+  <div class="card p-4">
+    <div class="eyebrow">Submitted</div>
+    <div class="kpi-value mt-1">{{ d.submitted|usd }}</div>
+    <div class="kpi-note">{{ d.submitted_count }} expenses in {{ d.period_label }}</div>
+  </div>
+  <a href="/finance/queue" class="card p-4 hover:border-indigo-300">
+    <div class="eyebrow">Needs a decision</div>
+    <div class="kpi-value mt-1">{{ d.review_count }}</div>
+    <div class="kpi-note">{{ d.queue.needs_info.count }} waiting on employee · {{ d.queue.flagged.count }} flagged · {{ d.queue.held.count }} held</div>
+  </a>
+  <a href="/reimburse" class="card p-4 hover:border-indigo-300">
+    <div class="eyebrow">Ready to reimburse</div>
+    <div class="kpi-value mt-1">{{ d.payable_total|usd }}</div>
+    <div class="kpi-note">{{ d.payable_count }} approved, unpaid · {{ d.paid_out|usd }} paid out via PayPal</div>
+  </a>
+  <a href="/reports/tax?period={{ d.period }}" class="card p-4 hover:border-indigo-300">
+    <div class="eyebrow">Missing documents</div>
+    <div class="kpi-value mt-1">{{ d.missing_count }}</div>
+    <div class="kpi-note">expenses to fix before filing</div>
+  </a>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-4 mb-4">
+  <section class="card p-5 lg:col-span-2">
+    <div class="eyebrow">Deductible share of submitted spend</div>
+    {% if d.submitted %}
+    <div class="flex flex-wrap items-center gap-6 mt-4">
+      <div class="relative" style="width: 176px; height: 176px;">
+        <canvas id="splitChart" role="img" aria-label="Share of submitted spend by outcome"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div class="text-3xl font-semibold tracking-tight">{{ d.deductible_pct|round|int }}%</div>
+          <div class="text-xs text-slate-500">deductible</div>
+        </div>
+      </div>
+      <table class="flex-1 min-w-52 text-sm">
+        <tbody>
+        {% for s in d.split %}
+          <tr class="border-b border-slate-100 last:border-0" title="{{ s.note }}">
+            <td class="py-1.5"><span class="inline-flex items-center gap-2"><span class="legend-swatch" style="background: {{ series[s.key] }}"></span>{{ s.label }}</span></td>
+            <td class="py-1.5 text-right num">{{ s.amount|usd }}</td>
+            <td class="py-1.5 pl-3 text-right num text-slate-500 w-14">{{ s.pct }}%</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-slate-500 mt-4">Deductible and nondeductible cover approved and paid expenses. Nondeductible amounts are still reimbursed to the employee.</p>
+    {% else %}
+    <p class="text-sm text-slate-500 mt-4">No expenses in {{ d.period_label }}.</p>
+    {% endif %}
+  </section>
+
+  <section class="card p-5 lg:col-span-3">
+    <div class="flex items-center justify-between">
+      <div class="eyebrow">Accepted spend by month</div>
+      <div class="flex gap-4 text-xs text-slate-600">
+        <span class="inline-flex items-center gap-1.5"><span class="legend-swatch" style="background: var(--series-1)"></span>Deductible</span>
+        <span class="inline-flex items-center gap-1.5"><span class="legend-swatch" style="background: var(--series-2)"></span>Nondeductible</span>
+      </div>
+    </div>
+    <div class="mt-4" style="height: 290px;"><canvas id="monthChart" role="img" aria-label="Deductible and nondeductible spend by month"></canvas></div>
+  </section>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-4 mb-4">
+  <section class="card p-5 lg:col-span-3">
+    <div class="eyebrow mb-3">Spend by category</div>
+    {% set top = d.by_category[0].spent if d.by_category else 1 %}
+    <div class="space-y-3">
+      {% for c in d.by_category[:7] %}
+      <div class="grid items-center gap-3 text-sm" style="grid-template-columns: 9.5rem 1fr 6.5rem 3.2rem;">
+        <span class="truncate">{{ c.label }}</span>
+        <div class="meter" title="{{ c.deductible|usd }} deductible, {{ c.nondeductible|usd }} nondeductible">
+          <span style="width: {{ (c.deductible / top * 100)|round(2) }}%; background: var(--series-1)"></span>
+          {% if c.nondeductible %}<span style="width: {{ (c.nondeductible / top * 100)|round(2) }}%; background: var(--series-2)"></span>{% endif %}
+        </div>
+        <span class="num text-right">{{ c.spent|usd }}</span>
+        <span class="num text-right text-slate-500 text-xs">{{ ((c.deductible / c.spent * 100)|round|int if c.spent else 0) }}%</span>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No accepted spend yet.</p>
+      {% endfor %}
+    </div>
+    <p class="text-xs text-slate-500 mt-4">Bar length is spend; the last column is the deductible share of that category.</p>
+  </section>
+
+  <section class="card p-5 lg:col-span-2">
+    <div class="eyebrow mb-3">How expenses arrive and get decided</div>
+    {% set n = d.submitted_count or 1 %}
+    <dl class="space-y-4 text-sm">
+      <div>
+        <div class="flex justify-between mb-1.5"><dt>Paid through PayPal <span class="text-slate-500">(receipt arrives automatically)</span></dt><dd class="num">{{ d.sources.paypal }}</dd></div>
+        <div class="meter"><span style="width: {{ (d.sources.paypal / n * 100)|round(2) }}%; background: var(--accent)"></span></div>
+      </div>
+      <div>
+        <div class="flex justify-between mb-1.5"><dt>Uploaded receipt</dt><dd class="num">{{ d.sources.upload }}</dd></div>
+        <div class="meter"><span style="width: {{ (d.sources.upload / n * 100)|round(2) }}%; background: var(--accent)"></span></div>
+      </div>
+      <div>
+        <div class="flex justify-between mb-1.5"><dt>Imported PayPal history</dt><dd class="num">{{ d.sources["import"] }}</dd></div>
+        <div class="meter"><span style="width: {{ (d.sources["import"] / n * 100)|round(2) }}%; background: var(--accent)"></span></div>
+      </div>
+    </dl>
+    <div class="border-t border-slate-200 mt-5 pt-4 text-sm flex flex-wrap items-center gap-x-5 gap-y-2">
+      <span class="eyebrow">Decision engine</span>
+      <span><span class="chip badge-llm">llm</span> <span class="num ml-1">{{ d.engines.llm }}</span></span>
+      <span><span class="chip badge-rules">rules</span> <span class="num ml-1">{{ d.engines.rules }}</span></span>
+    </div>
+    <p class="text-xs text-slate-500 mt-2">Every decision records which engine produced it. Without an AI key, or when the key fails, the rule engine decides.</p>
+  </section>
+</div>
+
+<section class="card p-5">
+  <div class="flex flex-wrap items-baseline gap-3 mb-1">
+    <h2 class="font-semibold">Confirm with your CPA</h2>
+    <span class="tag">{{ d.cpa_items|length }} expenses</span>
+  </div>
+  <p class="page-sub mb-4">Accepted expenses whose tax treatment depends on a judgment call. Each note says what to confirm before the books are closed.</p>
+  {% if d.cpa_items %}
+  <table class="w-full text-sm">
+    <thead class="text-left border-b border-slate-200"><tr><th class="py-2 pr-3">Expense</th><th class="pr-3">Employee</th><th class="pr-3">What to confirm</th><th class="pr-3">Engine</th><th class="text-right">Total</th></tr></thead>
+    <tbody>
+    {% for i in d.cpa_items %}
+      <tr class="border-b border-slate-100 align-top">
+        <td class="py-2.5 pr-3 whitespace-nowrap"><a class="text-indigo-600 hover:underline font-medium" href="/expenses/{{ i.expense_id }}">{{ i.vendor }}</a><div class="text-xs text-slate-500 num">#{{ i.expense_id }} · {{ i.date }}</div></td>
+        <td class="py-2.5 pr-3 whitespace-nowrap">{{ i.employee }}</td>
+        <td class="py-2.5 pr-3">{% for note in i.notes %}<div class="{{ 'mt-1' if not loop.first else '' }}">{{ note }}</div>{% endfor %}</td>
+        <td class="py-2.5 pr-3"><span class="chip badge-{{ i.engine }}">{{ i.engine }}</span></td>
+        <td class="py-2.5 text-right num">{{ i.total|usd }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-slate-500">Nothing to confirm for {{ d.period_label }}.</p>
+  {% endif %}
+  <p class="text-xs text-slate-500 mt-4">{{ disclaimer }}</p>
+</section>
+
+<script>
+  const DASH = {{ {"split": d.split, "months": d.months}|tojson }};
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const usd = v => "$" + Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = "#5B6472";
+  const tooltip = {backgroundColor: "#0B1220", padding: 10, cornerRadius: 6, titleFont: {weight: "600"}, displayColors: true, boxWidth: 8, boxHeight: 8};
+
+  const parts = DASH.split.filter(s => s.amount > 0);
+  if (parts.length && document.getElementById("splitChart")) {
+    new Chart(document.getElementById("splitChart"), {
+      type: "doughnut",
+      data: {labels: parts.map(s => s.label), datasets: [{
+        data: parts.map(s => s.amount),
+        backgroundColor: parts.map(s => css({deductible: "--series-1", nondeductible: "--series-2", review: "--series-3", rejected: "--series-4"}[s.key])),
+        borderColor: "#FFFFFF", borderWidth: 2, hoverOffset: 3,
+      }]},
+      options: {cutout: "72%", plugins: {legend: {display: false},
+        tooltip: {...tooltip, callbacks: {label: c => ` ${usd(c.parsed)} (${parts[c.dataIndex].pct}%)`}}}},
+    });
+  }
+  if (DASH.months.length) {
+    const bar = (label, key, color) => ({label, data: DASH.months.map(m => m[key]), backgroundColor: css(color),
+      borderColor: "#FFFFFF", borderWidth: {top: 2, right: 0, bottom: 0, left: 0}, borderRadius: 4, maxBarThickness: 44});
+    new Chart(document.getElementById("monthChart"), {
+      type: "bar",
+      data: {labels: DASH.months.map(m => m.label), datasets: [bar("Deductible", "deductible", "--series-1"), bar("Nondeductible", "nondeductible", "--series-2")]},
+      options: {maintainAspectRatio: false, interaction: {mode: "index", intersect: false},
+        plugins: {legend: {display: false}, tooltip: {...tooltip, callbacks: {label: c => ` ${c.dataset.label}: ${usd(c.parsed.y)}`}}},
+        scales: {x: {stacked: true, grid: {display: false}, border: {color: "#E3E6EB"}},
+                 y: {stacked: true, border: {display: false}, grid: {color: "#EEF0F3"}, ticks: {maxTicksLimit: 5, callback: v => "$" + (v >= 1000 ? (v / 1000) + "k" : v)}}}},
+    });
+  }
+</script>
+{% endblock %}

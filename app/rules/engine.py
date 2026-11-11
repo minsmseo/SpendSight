@@ -127,7 +127,8 @@ def _money(v: float) -> str:
 
 
 def _count_people(attendees: str) -> int:
-    parts = [p for p in re.split(r",|;|\band\b|&|\n", attendees or "") if p.strip()]
+    names = re.sub(r"\([^)]*\)", "", attendees or "")      # "Dana Park (Initech, customer)" is one person
+    parts = [p for p in re.split(r",|;|\band\b|&|\n", names) if p.strip()]
     return max(1, len(parts))
 
 

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Vendor Store · {{ app_name }}{% endblock %}
+{% block crumb %}Employee · Vendor store{% endblock %}
 {% block content %}
 <script>
   const STORE = {{ {"vendors": vendors, "employees": employees, "mock": mock, "clientId": paypal_client_id}|tojson }};
@@ -77,7 +78,7 @@
       vendors: STORE.vendors, employees: STORE.employees, mock: STORE.mock,
       vendor: null, cart: [], employeeId: STORE.employees[0]?.id ?? 1, purpose: "", attendees: "",
       total: 0, intent: "CAPTURE", sdkIntent: null, error: "", busy: false,
-      usd: v => "$" + Number(v).toFixed(2),
+      usd: v => "$" + Number(v).toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2}),
       init() {},
       add(v, it) {
         if (this.vendor && this.vendor.id !== v.id) this.cart = [];      // one vendor per order

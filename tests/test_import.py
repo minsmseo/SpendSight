@@ -66,7 +66,7 @@ def test_import_creates_needs_info_expenses_once(client):
 
     first = client.post("/api/paypal/import", json={**last_days(31), "employee_id": ALICE}).json()
     assert first["imported"] == 3 and first["skipped"]["payouts"] == 1 and first["skipped"]["not_completed"] == 1
-    assert first["skipped"]["already_recorded"] == 0 and first["mode"] == "mock"
+    assert first["mode"] == "mock"      # store purchases made earlier in the run may show up as already recorded
     rows = [row(client, eid) for eid in first["expense_ids"]]
     assert {r["vendor"] for r in rows} == {"CloudStack SaaS", "SkyAir", "Coffee & Co"}
     assert {(r["source"], r["status"], r["employee"]) for r in rows} == {("import", "needs_info", "Alice Chen")}
@@ -74,7 +74,7 @@ def test_import_creates_needs_info_expenses_once(client):
     assert {r["category"] for r in rows} == {"software", "travel_transport", "meal"}
 
     again = client.post("/api/paypal/import", json={**last_days(31), "employee_id": ALICE}).json()
-    assert again["imported"] == 0 and again["skipped"]["already_recorded"] == 3
+    assert again["imported"] == 0 and again["skipped"]["already_recorded"] == first["skipped"]["already_recorded"] + 3
 
     # The employee supplies the purpose and the expense is reviewed like any other.
     flight = next(r for r in rows if r["vendor"] == "SkyAir")

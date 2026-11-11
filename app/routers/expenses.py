@@ -85,7 +85,7 @@ def list_rows(session: Session, employee_id: int | None = None, status: str | No
 
 @router.get("/")
 def home(request: Request):
-    return RedirectResponse("/employee" if current_role(request) == "employee" else "/finance/queue")
+    return RedirectResponse("/employee" if current_role(request) == "employee" else "/dashboard")
 
 
 @router.get("/employee")

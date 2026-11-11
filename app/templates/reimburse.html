@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Reimburse · {{ app_name }}{% endblock %}
+{% block crumb %}Finance · Reimburse{% endblock %}
 {% block content %}
 <script>const PAYOUT = {{ {"ids": expense_ids, "batches": batches}|tojson }};</script>
 <div x-data="payouts()" x-init="init()">

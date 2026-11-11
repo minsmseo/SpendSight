@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app import config
 from app.db import init_db
 from app.routers import (
+    dashboard,
     expenses,
     onboarding,
     paypal_checkout,
@@ -34,7 +35,7 @@ app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), nam
 config.UPLOAD_DIR.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(config.UPLOAD_DIR)), name="uploads")
 
-for module in (onboarding, expenses, paypal_checkout, paypal_import, webhooks, reimburse, reports, settings):
+for module in (dashboard, onboarding, expenses, paypal_checkout, paypal_import, webhooks, reimburse, reports, settings):
     app.include_router(module.router)
 
 
@@ -57,6 +58,6 @@ def public_config():
 @app.get("/role/{role}")
 def switch_role(role: str):
     role = role if role in ROLES else "finance"
-    resp = RedirectResponse("/employee" if role == "employee" else "/finance/queue", status_code=303)
+    resp = RedirectResponse("/employee" if role == "employee" else "/dashboard", status_code=303)
     resp.set_cookie("role", role, samesite="lax")
     return resp

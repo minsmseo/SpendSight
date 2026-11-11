@@ -95,6 +95,50 @@ def _add_expense(session: Session, rng: random.Random, emp: Employee, when: date
     ))
 
 
+# A few hand-picked historic expenses whose tax treatment a CPA should confirm (dashboard list).
+# (employee index, vendor, items, purpose, attendees, days ago, source)
+CURATED = [
+    (2, "Gift Box Co", [("Client thank-you gift box", 60.0)],
+     "Thank-you gift for Initech marketing lead after the launch", "Dana Park (Initech, customer)", 24, "paypal"),
+    (1, "Coffee & Co", [("Office coffee box (12 cups)", 34.0)],
+     "Snacks and coffee for the office kitchen", "", 33, "upload"),
+    (0, "Stadium Tickets", [("Game tickets (2 seats)", 280.0)],
+     "Game tickets to host Globex client and discuss renewal", "Jane Doe (Globex CTO)", 41, "paypal"),
+    (2, "Parcel Post", [("Shipping labels and postage", 84.0)],
+     "Shipping marketing kits and supplies to customers", "", 18, "upload"),
+    (1, "Lakeside Events", [("Holiday party venue and team event package", 460.0)],
+     "Holiday party for all employees", "", 27, "paypal"),
+]
+
+
+def _add_curated(session: Session, employees: list[Employee], now: datetime) -> None:
+    for idx, vendor, items, purpose, attendees, days_ago, source in CURATED:
+        day = now - timedelta(days=days_ago)
+        while rules.to_local(day.replace(hour=20)).weekday() >= 5:
+            day -= timedelta(days=1)
+        when = day.replace(hour=20, minute=15)                 # midday Pacific
+        total = round(sum(a for _, a in items), 2)
+        exp = Expense(
+            employee_id=employees[idx].id, source=source, status="draft", vendor=vendor, purchased_at=when,
+            total=total, purpose=purpose, attendees=attendees,
+            paypal_order_id=f"SEEDC{days_ago:07d}" if source == "paypal" else None,
+            paypal_capture_id=f"SEEDCAPC{days_ago:05d}" if source == "paypal" else None,
+            created_at=when + timedelta(hours=2), substantiated_at=when + timedelta(days=2),
+        )
+        session.add(exp)
+        session.flush()
+        if source == "upload":
+            exp.receipt_path = _seed_receipt(exp.id, vendor, when, items[0][0], total)
+        for name, amount in items:
+            session.add(LineItem(expense_id=exp.id, name=name, unit_amount=amount, amount=amount))
+        session.commit()
+        result = rules.review_expense(session, exp.id)         # real rule-engine decision and reasons
+        if result["status"] == "approved":
+            exp.status = "paid"
+            session.add(exp)
+            session.commit()
+
+
 def seed(session: Session, days: int = 90, rows: int = 150) -> None:
     rng = random.Random(42)
     now = utcnow().replace(minute=0, second=0, microsecond=0)
@@ -116,6 +160,7 @@ def seed(session: Session, days: int = 90, rows: int = 150) -> None:
         when = day.replace(hour=0, minute=rng.choice((0, 10, 25, 40, 55))) + timedelta(hours=rng.randint(9, 19) + 8)
         _add_expense(session, rng, emp, when, now)
     session.commit()
+    _add_curated(session, employees, now)
 
 
 def seed_if_empty() -> bool:

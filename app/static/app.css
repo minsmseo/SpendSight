@@ -1,10 +1,119 @@
-/* Small additions on top of Tailwind CDN. */
-.chip { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
-.chip-approved, .chip-paid { background: #dcfce7; color: #166534; }
-.chip-needs_info { background: #fef9c3; color: #854d0e; }
-.chip-flagged, .chip-held { background: #ffedd5; color: #9a3412; }
-.chip-rejected { background: #fee2e2; color: #991b1b; }
-.chip-draft { background: #e5e7eb; color: #374151; }
-.badge-llm { background: #ede9fe; color: #5b21b6; }
-.badge-rules { background: #e0f2fe; color: #075985; }
-.badge-finance { background: #e0e7ff; color: #3730a3; }
+/* SpendSight UI: ink sidebar, hairline surfaces, one teal accent, mono figures. Tailwind (CDN) handles utilities. */
+:root {
+  --ink: #0B1220;
+  --ink-2: #121B2E;
+  --text: #111827;
+  --muted: #5B6472;
+  --faint: #8A93A2;
+  --line: #E3E6EB;
+  --surface: #FFFFFF;
+  --canvas: #F5F6F8;
+  --accent: #0E6655;
+  --accent-soft: #EDF6F3;
+  /* Chart series (validated categorical order) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+}
+
+html { -webkit-font-smoothing: antialiased; }
+body { font-family: Inter, system-ui, "Segoe UI", sans-serif; color: var(--text); background: var(--canvas); font-size: 14px; }
+.font-mono, .num { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; }
+h1 { letter-spacing: -0.015em; }
+
+/* --- shell --- */
+.app-shell { min-height: 100vh; display: flex; }
+.sidebar { width: 232px; flex: none; background: var(--ink); color: #C9D1DE; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 18px 18px 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.brand-mark { width: 26px; height: 26px; border-radius: 6px; background: linear-gradient(135deg, #1C7C69 0 50%, #78B8A7 50% 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.brand-name { display: block; color: #fff; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; line-height: 1.2; }
+.brand-sub { display: block; font-size: 11px; color: #7E8AA0; line-height: 1.3; }
+.nav { padding: 10px 10px; flex: 1; overflow-y: auto; }
+.nav-heading { font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #6B778D; padding: 14px 10px 6px; }
+.nav-link { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; font-size: 13.5px; color: #C9D1DE; }
+.nav-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-link.is-active { background: rgba(120,184,167,.16); color: #fff; box-shadow: inset 2px 0 0 #78B8A7; }
+.nav-icon { width: 17px; height: 17px; flex: none; opacity: .85; }
+.sidebar-foot { padding: 0 10px 14px; border-top: 1px solid rgba(255,255,255,.07); }
+.role-switch { display: grid; grid-template-columns: 1fr 1fr; background: rgba(255,255,255,.06); border-radius: 6px; padding: 3px; margin: 0 2px; }
+.role-switch a { text-align: center; font-size: 12.5px; padding: 5px 0; border-radius: 4px; color: #AAB4C5; }
+.role-switch a.is-active { background: #fff; color: var(--ink); font-weight: 600; }
+
+.app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 28px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.topbar-title { font-size: 12.5px; color: var(--muted); }
+.env { display: flex; gap: 8px; }
+.env-tag { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px/1 "IBM Plex Mono", ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; background: #FAFBFC; white-space: nowrap; }
+.env-tag b { color: var(--text); font-weight: 600; }
+.env-dot { width: 6px; height: 6px; border-radius: 50%; background: #A6AEBB; }
+.env-dot.is-live { background: #12936F; }
+.env-dot.is-warn { background: #C2620A; }
+.banner-warn { background: #FFF6E9; border-bottom: 1px solid #F3D9B1; color: #7A3E06; font-size: 13px; text-align: center; padding: 7px 24px; }
+.content { flex: 1; width: 100%; max-width: 1360px; margin: 0 auto; padding: 28px; }
+.footer { text-align: center; font-size: 11.5px; color: var(--faint); padding: 14px 24px 18px; }
+
+@media (max-width: 860px) {
+  .app-shell { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; }
+  .nav { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 10px; }
+  .nav-heading { display: none; }
+  .sidebar-foot { padding: 8px 10px 10px; }
+  .content { padding: 18px 16px; }
+  .topbar { padding: 0 16px; }
+}
+
+/* --- surfaces and type --- */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.page-sub { font-size: 13px; color: var(--muted); }
+table thead th { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+input, select, textarea { font-size: 13.5px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid rgba(14,102,85,.25); outline-offset: 0; border-color: var(--accent) !important; }
+button, a { transition: background-color .12s ease, color .12s ease, border-color .12s ease; }
+
+/* --- status tags: small, rectangular, dot + label --- */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 7px; border-radius: 4px; font-size: 11.5px; font-weight: 600; line-height: 1.5; white-space: nowrap; border: 1px solid transparent; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .85; }
+.chip-approved { background: #EAF6F0; color: #0B6B48; border-color: #CDE8DB; }
+.chip-paid { background: #EEF2F6; color: #334155; border-color: #DCE3EA; }
+.chip-needs_info { background: #FFF7E0; color: #7A5200; border-color: #F4E3B0; }
+.chip-flagged { background: #FFF0E6; color: #9A3D05; border-color: #F6D7C0; }
+.chip-held { background: #EEF0FF; color: #3A3F9E; border-color: #D9DDFB; }
+.chip-rejected { background: #FDEDED; color: #9B1C1C; border-color: #F5CFCF; }
+.chip-draft { background: #F1F3F5; color: #4B5563; border-color: #E2E6EA; }
+/* engine badges: outlined mono tags, no dot */
+.badge-llm, .badge-rules, .badge-finance { font-family: "IBM Plex Mono", ui-monospace, monospace; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; }
+.badge-llm::before, .badge-rules::before, .badge-finance::before { display: none; }
+.badge-llm { color: #5B3FB5; border-color: #D9CFF5; background: #F7F4FE; }
+.badge-rules { color: #1F5E8C; border-color: #CFE0EE; background: #F3F8FC; }
+.badge-finance { color: #0E6655; border-color: #ACD5C9; background: #EDF6F3; }
+.tag { display: inline-block; font: 500 11px/1.5 "IBM Plex Mono", ui-monospace, monospace; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); background: #FAFBFC; white-space: nowrap; }
+.tag-warn { color: #9A3D05; border-color: #F6D7C0; background: #FFF6EF; }
+
+/* --- AG Grid: match the product, not the default theme --- */
+.ag-theme-quartz {
+  --ag-font-family: Inter, system-ui, sans-serif;
+  --ag-font-size: 13px;
+  --ag-foreground-color: #111827;
+  --ag-border-color: #E3E6EB;
+  --ag-header-background-color: #FAFBFC;
+  --ag-header-foreground-color: #5B6472;
+  --ag-row-hover-color: #F3F8F6;
+  --ag-selected-row-background-color: #EDF6F3;
+  --ag-active-color: #0E6655;
+  --ag-wrapper-border-radius: 8px;
+  --ag-row-height: 40px;
+  --ag-header-height: 38px;
+  --ag-checkbox-checked-color: #0E6655;
+}
+.ag-theme-quartz .ag-header-cell-text { font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.ag-theme-quartz .ag-right-aligned-cell { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.ag-theme-quartz .ag-paging-panel { font-size: 12px; color: var(--muted); }
+
+/* --- dashboard pieces --- */
+.kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.kpi-note { font-size: 12px; color: var(--muted); }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.meter { height: 8px; border-radius: 4px; background: #EEF0F3; overflow: hidden; display: flex; gap: 2px; }
+.meter > span { display: block; height: 100%; border-radius: 4px; }

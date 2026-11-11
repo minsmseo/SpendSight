@@ -32,6 +32,7 @@ def page(request: Request, name: str, **ctx):
         "app_name": config.APP_NAME,
         "author": config.AUTHOR,
         "role": current_role(request),
+        "path": request.url.path,
         "paypal_mode": config.PAYPAL_MODE_LABEL,
         "ai_status": ai_provider.status(),
         "disclaimer": config.TAX_DISCLAIMER,

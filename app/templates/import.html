@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Import PayPal history · {{ app_name }}{% endblock %}
+{% block crumb %}Finance · Import PayPal history{% endblock %}
 {% block content %}
 <script>const IMPORT = {{ {"start": start, "end": end, "employee": employees[0].id if employees else 1, "maxDays": max_days}|tojson }};</script>
 <div x-data="importer()">

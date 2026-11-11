@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Confirm receipt · {{ app_name }}{% endblock %}
+{% block crumb %}Employee · Upload receipt{% endblock %}
 {% block content %}
 {% macro weak(name) %}{{ "border-yellow-400 bg-yellow-50" if confidence.get(name, 1) < 0.6 else "border-slate-300" }}{% endmacro %}
 <h1 class="text-2xl font-semibold mb-1">Confirm receipt details</h1>
