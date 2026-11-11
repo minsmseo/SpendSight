@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Import PayPal history · {{ app_name }}{% endblock %}
+{% block content %}
+<script>const IMPORT = {{ {"start": start, "end": end, "employee": employees[0].id if employees else 1, "maxDays": max_days}|tojson }};</script>
+<div x-data="importer()">
+  <h1 class="text-2xl font-semibold mb-1">Import PayPal history</h1>
+  <p class="text-sm text-slate-500 mb-6">Backfill purchases that were paid from the company PayPal account outside {{ app_name }} (PayPal Transaction Search).</p>
+
+  <section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+    <div class="flex flex-wrap items-end gap-4 text-sm">
+      <label>From<br><input type="date" x-model="start" class="border border-slate-300 rounded-lg px-3 py-1.5"></label>
+      <label>To<br><input type="date" x-model="end" class="border border-slate-300 rounded-lg px-3 py-1.5"></label>
+      <label>Assign to<br>
+        <select x-model.number="employee" class="border border-slate-300 rounded-lg px-2 py-1.5">
+          {% for emp in employees %}<option value="{{ emp.id }}">{{ emp.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <button @click="run()" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium disabled:opacity-50">Import</button>
+      <span x-show="busy" class="text-slate-500">Asking PayPal…</span>
+    </div>
+    <label class="flex items-center gap-2 text-sm mt-3">
+      <input type="checkbox" x-model="incoming">
+      Also import payments this account received <span class="text-slate-400">(sandbox: the demo vendors are paid into the same account)</span>
+    </label>
+    <ul class="text-xs text-slate-500 mt-4 list-disc ml-5 space-y-1">
+      <li>PayPal allows at most {{ max_days }} days per import.</li>
+      <li>Sandbox data can take 3 hours or more to appear in Transaction Search.</li>
+      <li>Imported expenses have no business purpose yet, so the agent asks the employee for it.</li>
+      <li>Payouts, pending payments and purchases already recorded here are skipped.</li>
+      {% if mock %}<li>PayPal is in mock mode: sample transactions are returned.</li>{% endif %}
+    </ul>
+    <p x-show="error" x-text="error" class="text-sm text-red-700 mt-3"></p>
+  </section>
+
+  <section class="bg-white rounded-xl border border-slate-200 p-5" x-show="result">
+    <template x-if="result">
+      <div class="text-sm">
+        <h2 class="font-semibold mb-2" x-text="result.imported + ' of ' + result.found + ' transactions imported'"></h2>
+        <p class="text-slate-600 mb-3" x-show="skippedText()" x-text="'Skipped: ' + skippedText() + '.'"></p>
+        <p class="text-slate-600 mb-3" x-show="!result.found">PayPal returned no transactions for this range. Recent sandbox activity may not be available yet.</p>
+        <div class="flex flex-wrap gap-2" x-show="result.imported">
+          <template x-for="id in result.expense_ids" :key="id">
+            <a :href="'/expenses/' + id" class="chip chip-needs_info" x-text="'#' + id"></a>
+          </template>
+        </div>
+        <p class="mt-4" x-show="result.imported"><a href="/finance/queue" class="text-indigo-600 underline">Open the queue</a> (status: needs info).</p>
+        <p class="text-xs text-slate-400 mt-3" x-show="result.last_refreshed" x-text="'PayPal data last refreshed ' + result.last_refreshed"></p>
+      </div>
+    </template>
+  </section>
+</div>
+<script>
+  function importer() {
+    return {
+      start: IMPORT.start, end: IMPORT.end, employee: IMPORT.employee, incoming: false, busy: false, error: "", result: null,
+      skippedText() {
+        const labels = {already_recorded: "already recorded", payouts: "payout(s)", not_completed: "not completed", incoming: "incoming payments", other: "other"};
+        return Object.entries(this.result.skipped).filter(([, n]) => n).map(([k, n]) => `${n} ${labels[k]}`).join(", ");
+      },
+      async run() {
+        this.busy = true; this.error = ""; this.result = null;
+        const r = await fetch("/api/paypal/import", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({start_date: this.start, end_date: this.end, employee_id: this.employee, include_incoming: this.incoming})});
+        const data = await r.json().catch(() => ({}));
+        this.busy = false;
+        if (r.ok) this.result = data; else this.error = data.detail || "Import failed";
+      },
+    };
+  }
+</script>
+{% endblock %}

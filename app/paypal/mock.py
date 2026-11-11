@@ -6,7 +6,7 @@ Payout items turn SUCCESS three seconds after the batch is created.
 import copy
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.paypal.client import PayPalError, build_order_body
 
@@ -147,8 +147,52 @@ class MockPayPalClient:
         }
 
     # --- Transaction Search / Webhooks -------------------------------------
-    def search_transactions(self, start_date: str, end_date: str) -> dict:
-        return {"transaction_details": [], "total_items": 0, "total_pages": 0}
+    def search_transactions(self, start_date: str, end_date: str, page: int = 1) -> dict:
+        """Sample account history: purchases made outside the app, a payout, a pending payment, and
+        the orders captured through this mock (so duplicate detection has something to find)."""
+        start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc).replace(hour=18, minute=5, second=0, microsecond=0)
+
+        def tx(tx_id, days_ago, value, code="T0006", status="S", name="", subject="", items=()):
+            when = now - timedelta(days=days_ago)
+            return when, {
+                "transaction_info": {
+                    "transaction_id": tx_id, "transaction_event_code": code, "transaction_status": status,
+                    "transaction_initiation_date": when.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                    "transaction_amount": {"currency_code": "USD", "value": f"{value:.2f}"},
+                    "transaction_subject": subject,
+                },
+                "payer_info": {"payer_name": {"alternate_full_name": name}},
+                "cart_info": {"item_details": [
+                    {"item_name": n, "item_quantity": str(q), "item_unit_price": {"currency_code": "USD", "value": f"{u:.2f}"},
+                     "item_amount": {"currency_code": "USD", "value": f"{u * q:.2f}"}} for n, q, u in items]},
+            }
+
+        rows = [
+            tx("MOCKTX0001", 2, -149.00, name="CloudStack SaaS", items=[("Analytics add-on subscription (monthly)", 1, 149.00)]),
+            tx("MOCKTX0002", 5, -412.60, name="SkyAir", items=[("Economy airfare SFO to SEA (round trip)", 1, 412.60)]),
+            tx("MOCKTX0003", 9, -23.40, name="Coffee & Co", subject="Coffee & Co order"),
+            tx("MOCKTX0004", 3, -93.00, code="T0001", name="Alice Chen", subject="Expense reimbursement"),
+            tx("MOCKTX0005", 1, -58.00, status="P", name="Office Depotish", items=[("Toner cartridge", 1, 58.00)]),
+        ]
+        for order in self.orders.values():
+            unit = order["purchase_units"][0]
+            for capture in unit.get("payments", {}).get("captures", []):
+                when = datetime.strptime(capture["create_time"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                rows.append((when, {
+                    "transaction_info": {
+                        "transaction_id": capture["id"], "transaction_event_code": "T0006", "transaction_status": "S",
+                        "transaction_initiation_date": when.strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                        "transaction_amount": capture["amount"], "custom_field": unit.get("custom_id", ""),
+                        "invoice_id": unit.get("invoice_id", ""),
+                    },
+                    "payer_info": {"payer_name": {"alternate_full_name": "Sandbox Buyer"}},
+                    "cart_info": {"item_details": []},
+                }))
+        found = [detail for when, detail in rows if start <= when <= end]
+        return {"transaction_details": found if page == 1 else [], "total_items": len(found), "total_pages": 1, "page": page,
+                "last_refreshed_datetime": now.strftime("%Y-%m-%dT%H:%M:%S+0000")}
 
     def verify_webhook_signature(self, headers: dict, event: dict, webhook_id: str) -> bool:
         return True  # mock mode: nothing to verify against

@@ -10,6 +10,7 @@ from app.routers import (
     expenses,
     onboarding,
     paypal_checkout,
+    paypal_import,
     reimburse,
     reports,
     settings,
@@ -33,7 +34,7 @@ app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), nam
 config.UPLOAD_DIR.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(config.UPLOAD_DIR)), name="uploads")
 
-for module in (onboarding, expenses, paypal_checkout, webhooks, reimburse, reports, settings):
+for module in (onboarding, expenses, paypal_checkout, paypal_import, webhooks, reimburse, reports, settings):
     app.include_router(module.router)
 
 

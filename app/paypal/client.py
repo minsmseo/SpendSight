@@ -146,11 +146,12 @@ class PayPalClient:
         return self._request("GET", f"/v1/payments/payouts/{batch_id}")
 
     # --- Transaction Search v1 (backfill only; max 31 days per call) -------
-    def search_transactions(self, start_date: str, end_date: str) -> dict:
+    def search_transactions(self, start_date: str, end_date: str, page: int = 1) -> dict:
+        """One page of account history. Sandbox data can lag by three hours or more."""
         return self._request(
             "GET",
             "/v1/reporting/transactions",
-            params={"start_date": start_date, "end_date": end_date, "fields": "all", "page_size": 100},
+            params={"start_date": start_date, "end_date": end_date, "fields": "all", "page_size": 100, "page": page},
         )
 
     # --- Webhooks ---------------------------------------------------------

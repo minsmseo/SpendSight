@@ -22,6 +22,8 @@ SpendSight is for finance teams at US C corporations and for the CPA who closes 
 1. **Buy through PayPal.** The employee pays a vendor with PayPal. The itemized order becomes the
    receipt: vendor, date, lines, total. No upload, no OCR, no typing.
 2. **Or upload a receipt.** AI vision reads it; without an AI key, Tesseract OCR and a regex parser do.
+   Finance can also **import PayPal history** for purchases made outside SpendSight; those arrive
+   without a purpose, so the agent asks the employee for it.
 3. **Review.** An expense agent decides category and tax rule per line, checks the business purpose,
    and asks the employee a specific question when something is missing (for example, who attended).
 4. **Hold.** Purchases above the pre-approval threshold are only *authorized* at PayPal. Finance
@@ -42,7 +44,7 @@ Every decision shows which engine produced it (`llm` or `rules`) and a plain one
 | Payouts v1: create batch, get batch | `app/routers/reimburse.py` | implemented |
 | Webhooks: receive, verify signature, store once | `POST /webhooks/paypal` in `app/routers/webhooks.py` | implemented |
 | PayPal JS SDK buttons | Vendor Store page | implemented |
-| Transaction Search v1 | `PayPalClient.search_transactions` | client call only; the import screen is not built yet |
+| Transaction Search v1: account history, paged, max 31 days | Finance **Import** page, `POST /api/paypal/import` in `app/routers/paypal_import.py` | implemented (backfill only) |
 
 All calls go through one thin client (`app/paypal/client.py`). `app/paypal/mock.py` implements the same
 interface in memory and is used automatically when no PayPal credentials are set.
