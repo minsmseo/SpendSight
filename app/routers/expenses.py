@@ -42,6 +42,8 @@ def list_rows(session: Session, employee_id: int | None = None, status: str | No
         q = q.where(Expense.employee_id == employee_id)
     if status:
         q = q.where(Expense.status == status)
+    else:
+        q = q.where(Expense.status != "draft")       # unpaid carts never reach the queue
     expenses = session.exec(q).all()
     employees = {e.id: e for e in session.exec(select(Employee)).all()}
     items: dict[int, list[LineItem]] = {}

@@ -7,6 +7,33 @@
   <span class="chip chip-{{ e.status }}">{{ e.status.replace("_", " ") }}</span>
   {% if decision %}<span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span>{% endif %}
 </div>
+{% if e.status == "held" %}
+<div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-4" x-data="heldActions({{ e.id }})">
+  <div class="text-sm text-orange-900 flex-1">
+    <b>Held by {{ app_name }}, waiting for review.</b>
+    PayPal has authorized ${{ "%.2f"|format(e.total) }} but nothing has been captured yet.
+  </div>
+  {% if role == "finance" %}
+  <button @click="act('capture-auth')" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm disabled:opacity-50">Approve and capture</button>
+  <button @click="act('void-auth')" :disabled="busy" class="border border-red-300 text-red-700 rounded-lg px-4 py-2 text-sm disabled:opacity-50">Reject and void</button>
+  {% endif %}
+  <p x-show="error" x-text="error" class="text-sm text-red-700 w-full"></p>
+</div>
+<script>
+  function heldActions(id) {
+    return {
+      busy: false, error: "",
+      async act(action) {
+        this.busy = true; this.error = "";
+        const r = await fetch(`/api/expenses/${id}/${action}`, {method: "POST"});
+        if (r.ok) { window.location.reload(); return; }
+        this.error = (await r.json().catch(() => ({}))).detail || "Request failed";
+        this.busy = false;
+      },
+    };
+  }
+</script>
+{% endif %}
 <div class="grid md:grid-cols-2 gap-6">
   <section class="bg-white rounded-xl border border-slate-200 p-5">
     <h2 class="font-semibold mb-3">Receipt ({{ e.source }})</h2>
@@ -16,6 +43,8 @@
       <dt class="text-slate-500">Purpose</dt><dd class="col-span-2">{{ e.purpose or "—" }}</dd>
       <dt class="text-slate-500">Attendees</dt><dd class="col-span-2">{{ e.attendees or "—" }}</dd>
       {% if e.paypal_order_id %}<dt class="text-slate-500">PayPal order</dt><dd class="col-span-2 font-mono">{{ e.paypal_order_id }}</dd>{% endif %}
+      {% if e.paypal_authorization_id %}<dt class="text-slate-500">Authorization</dt><dd class="col-span-2 font-mono">{{ e.paypal_authorization_id }}</dd>{% endif %}
+      {% if e.paypal_capture_id %}<dt class="text-slate-500">Capture</dt><dd class="col-span-2 font-mono">{{ e.paypal_capture_id }}</dd>{% endif %}
     </dl>
     <table class="w-full text-sm">
       <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Item</th><th>Category</th><th class="text-right">Amount</th><th class="text-right">Deductible</th></tr></thead>
@@ -50,7 +79,7 @@
     {% else %}
       <p class="text-sm text-slate-500">Not reviewed yet.</p>
     {% endif %}
-    <p class="mt-6 text-xs text-slate-400">Coming next: follow-up thread, control chart, approve / reject / ask, capture or void authorization.</p>
+    <p class="mt-6 text-xs text-slate-400">Coming next: follow-up thread, control chart, approve / reject / ask.</p>
   </section>
 </div>
 {% endblock %}

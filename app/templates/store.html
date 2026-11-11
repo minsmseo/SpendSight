@@ -1,23 +1,151 @@
 {% extends "base.html" %}
 {% block title %}Vendor Store · {{ app_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-1">Vendor Store</h1>
-<p class="text-sm text-slate-500 mb-6">
-  Demo vendors. Carts above ${{ preapproval_threshold }} are held (PayPal authorization) until Finance reviews.
-  {% if mock %}PayPal is in mock mode: checkout will use a "Simulate PayPal payment" button.{% endif %}
-</p>
-<div class="grid md:grid-cols-3 gap-4">
-  {% for v in vendors %}
-  <section class="bg-white rounded-xl border border-slate-200 p-5">
-    <h2 class="font-semibold">{{ v.name }}</h2>
-    <div class="text-xs text-slate-400 mb-3">{{ v.category }}</div>
-    <ul class="text-sm space-y-1">
-      {% for it in v["items"] %}
-      <li class="flex justify-between"><span>{{ it.name }}</span><span class="font-mono">${{ "%.2f"|format(it.price) }}</span></li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endfor %}
+<script>
+  const STORE = {{ {"vendors": vendors, "employees": employees, "mock": mock, "clientId": paypal_client_id}|tojson }};
+</script>
+<div x-data="store()" x-init="init()">
+  <h1 class="text-2xl font-semibold mb-1">Vendor Store</h1>
+  <p class="text-sm text-slate-500 mb-6">Pay with PayPal and the itemized receipt lands in your expenses automatically. No upload, no typing.</p>
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 grid md:grid-cols-2 gap-4 content-start">
+      <template x-for="v in vendors" :key="v.id">
+        <section class="bg-white rounded-xl border border-slate-200 p-5">
+          <h2 class="font-semibold" x-text="v.name"></h2>
+          <div class="text-xs text-slate-400 mb-3" x-text="v.category.replace('_', ' ')"></div>
+          <ul class="text-sm space-y-2">
+            <template x-for="it in v.items" :key="it.sku">
+              <li class="flex items-center justify-between gap-2">
+                <span x-text="it.name"></span>
+                <span class="flex items-center gap-2 shrink-0">
+                  <span class="font-mono" x-text="usd(it.price)"></span>
+                  <button @click="add(v, it)" class="border border-indigo-600 text-indigo-600 rounded-lg px-2 py-0.5 text-xs hover:bg-indigo-50">Add</button>
+                </span>
+              </li>
+            </template>
+          </ul>
+        </section>
+      </template>
+    </div>
+
+    <aside class="bg-white rounded-xl border border-slate-200 p-5 h-fit lg:sticky lg:top-4">
+      <h2 class="font-semibold mb-3">Cart <span class="text-slate-400 font-normal" x-show="vendor" x-text="vendor ? '· ' + vendor.name : ''"></span></h2>
+      <p class="text-sm text-slate-400" x-show="!cart.length">Add items from one vendor.</p>
+      <ul class="text-sm space-y-2 mb-3">
+        <template x-for="line in cart" :key="line.sku">
+          <li class="flex items-center justify-between gap-2">
+            <span x-text="line.name"></span>
+            <span class="flex items-center gap-1 shrink-0">
+              <button @click="qty(line, -1)" class="border rounded px-1.5">−</button>
+              <span class="w-5 text-center" x-text="line.quantity"></span>
+              <button @click="qty(line, 1)" class="border rounded px-1.5">+</button>
+              <span class="font-mono w-20 text-right" x-text="usd(line.price * line.quantity)"></span>
+            </span>
+          </li>
+        </template>
+      </ul>
+      <div class="flex justify-between font-semibold border-t pt-2 mb-4" x-show="cart.length">
+        <span>Total</span><span class="font-mono" x-text="usd(total)"></span>
+      </div>
+      <div x-show="cart.length && intent === 'AUTHORIZE'" class="text-sm bg-orange-50 border border-orange-200 text-orange-800 rounded-lg p-3 mb-4">
+        Above the pre-approval threshold. PayPal will only <b>authorize</b> this payment: it is held by {{ app_name }} until Finance reviews it. Approved: captured. Rejected: voided.
+      </div>
+      <label class="block text-sm mb-3">Paying as
+        <select x-model.number="employeeId" class="mt-1 w-full border border-slate-300 rounded-lg px-2 py-1.5">
+          <template x-for="e in employees" :key="e.id"><option :value="e.id" x-text="e.name"></option></template>
+        </select>
+      </label>
+      <label class="block text-sm mb-3">Business purpose <span class="text-red-600">*</span>
+        <textarea x-model="purpose" rows="2" placeholder="e.g. Dinner with Globex CTO to discuss renewal" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5"></textarea>
+      </label>
+      <label class="block text-sm mb-4">Attendees <span class="text-slate-400">(optional)</span>
+        <input x-model="attendees" placeholder="Name (company, relationship), …" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5">
+      </label>
+      <p x-show="error" x-text="error" class="text-sm text-red-700 mb-3"></p>
+      <p x-show="busy" class="text-sm text-slate-500 mb-3">Processing payment…</p>
+      <div x-show="cart.length">
+        <button x-show="mock" @click="simulate()" :disabled="busy" class="w-full bg-indigo-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">Simulate PayPal payment</button>
+        <p x-show="mock" class="text-xs text-slate-400 mt-2">PayPal is in mock mode (no credentials set). With sandbox credentials the real PayPal button appears here.</p>
+        <div x-show="!mock" id="paypal-buttons"></div>
+      </div>
+    </aside>
+  </div>
 </div>
-<p class="mt-6 text-xs text-slate-400">Coming in build step 3: cart, business purpose and attendees fields, PayPal button.</p>
+<script>
+  function store() {
+    return {
+      vendors: STORE.vendors, employees: STORE.employees, mock: STORE.mock,
+      vendor: null, cart: [], employeeId: STORE.employees[0]?.id ?? 1, purpose: "", attendees: "",
+      total: 0, intent: "CAPTURE", sdkIntent: null, error: "", busy: false,
+      usd: v => "$" + Number(v).toFixed(2),
+      init() {},
+      add(v, it) {
+        if (this.vendor && this.vendor.id !== v.id) this.cart = [];      // one vendor per order
+        this.vendor = v;
+        const line = this.cart.find(l => l.sku === it.sku);
+        if (line) line.quantity++; else this.cart.push({sku: it.sku, name: it.name, price: it.price, quantity: 1});
+        this.refresh();
+      },
+      qty(line, d) {
+        line.quantity += d;
+        if (line.quantity <= 0) this.cart = this.cart.filter(l => l !== line);
+        if (!this.cart.length) this.vendor = null;
+        this.refresh();
+      },
+      payload() {
+        return {employee_id: this.employeeId, vendor_id: this.vendor.id, purpose: this.purpose, attendees: this.attendees,
+                items: this.cart.map(l => ({sku: l.sku, quantity: l.quantity}))};
+      },
+      async post(url, body) {
+        const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body || {})});
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || "Request failed");
+        return data;
+      },
+      async refresh() {
+        this.error = "";
+        if (!this.cart.length) { this.total = 0; this.intent = "CAPTURE"; return; }
+        try {
+          const q = await this.post("/api/paypal/quote", this.payload());
+          this.total = q.total; this.intent = q.intent;
+          if (!this.mock) this.renderButtons();
+        } catch (e) { this.error = e.message; }
+      },
+      async createOrder() {
+        if (!this.purpose.trim()) { this.error = "Business purpose is required."; throw new Error(this.error); }
+        this.error = "";
+        return (await this.post("/api/paypal/orders", this.payload())).order_id;
+      },
+      async complete(orderId) {
+        this.busy = true;
+        try {
+          const done = await this.post(`/api/paypal/orders/${orderId}/complete`);
+          window.location = "/expenses/" + done.expense_id;
+        } catch (e) { this.error = e.message; this.busy = false; }
+      },
+      async simulate() {
+        try { await this.complete(await this.createOrder()); } catch (e) { this.error = e.message; }
+      },
+      // The JS SDK fixes `intent` at load time, so reload it whenever the cart crosses the threshold.
+      renderButtons() {
+        if (this.sdkIntent === this.intent) return;
+        this.sdkIntent = this.intent;
+        document.getElementById("paypal-sdk")?.remove();
+        delete window.paypal;
+        document.getElementById("paypal-buttons").innerHTML = "";
+        const s = document.createElement("script");
+        s.id = "paypal-sdk";
+        s.src = "https://www.paypal.com/sdk/js?components=buttons&currency=USD&client-id=" +
+                encodeURIComponent(STORE.clientId) + "&intent=" + this.intent.toLowerCase();
+        s.onload = () => window.paypal.Buttons({
+          createOrder: () => this.createOrder(),
+          onApprove: data => this.complete(data.orderID),
+          onError: err => { this.error = this.error || "PayPal could not complete the payment."; },
+        }).render("#paypal-buttons");
+        s.onerror = () => { this.error = "Could not load the PayPal SDK."; this.sdkIntent = null; };
+        document.head.appendChild(s);
+      },
+    };
+  }
+</script>
 {% endblock %}

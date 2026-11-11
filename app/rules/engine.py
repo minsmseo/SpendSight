@@ -113,6 +113,15 @@ def policy_row(policy: dict, category: str) -> dict:
     return {}
 
 
+def needs_preapproval(policy: dict, category: str, category_total: float, total: float | None = None) -> bool:
+    """Above the category pre-approval line or the company-wide threshold. The Vendor Store uses the
+    same test to pick intent=AUTHORIZE, so a held payment never also gets a "no pre-approval" flag."""
+    category_line = float(policy_row(policy, category).get("preapproval_above") or 0)
+    company_line = float(policy.get("preapproval_threshold") or 0)
+    total = category_total if total is None else total
+    return (category_line > 0 and category_total > category_line) or (company_line > 0 and total > company_line)
+
+
 def _money(v: float) -> str:
     return f"${v:,.2f}"
 
@@ -229,10 +238,7 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
     if over_limit:
         flags.append("over_limit")
         reasons.append(f"{_money(primary_total)} is above the {_money(limit)} policy limit for {primary_label.lower()}.")
-    preapproval = float(row.get("preapproval_above") or 0)
-    global_pre = float(policy.get("preapproval_threshold") or 0)
-    needs_pre = (preapproval > 0 and primary_total > preapproval) or (global_pre > 0 and (expense.total or 0) > global_pre)
-    if needs_pre and expense.intent != "AUTHORIZE":
+    if needs_preapproval(policy, primary, primary_total, expense.total or 0) and expense.intent != "AUTHORIZE":
         flags.append("no_preapproval")
         reasons.append("The amount is above the pre-approval threshold and no pre-approval was requested.")
     now = now or datetime.now(timezone.utc)
