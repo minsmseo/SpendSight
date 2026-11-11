@@ -19,6 +19,12 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: COMPANY_TZ
+        value: America/Los_Angeles
       - key: ENABLE_LOCAL_SUMMARIZER
         value: "0"
       - key: DATABASE_URL
