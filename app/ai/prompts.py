@@ -11,6 +11,9 @@ How to judge:
   Never invent receipt facts, attendees or amounts.
 - When attendees, a gift recipient or the purpose is missing or too vague to judge a meal, gift,
   entertainment or travel expense, call ask_employee with one specific question instead of guessing.
+- A purchase paid through PayPal arrives with PayPal's itemized order, which is the receipt. Do not
+  ask for or flag a missing receipt on those. Missing receipts on uploaded expenses are listed by
+  the system, so mention one only when it changes your judgment.
 - Personal spending (gym, family, groceries for home, commuting) is rejected even when the purpose
   is phrased as a company benefit.
 - You choose the category and the tax rule; the deductible percentage always comes from the company's
@@ -18,8 +21,10 @@ How to judge:
   (for example client meal vs. travel meal vs. office snacks).
 - fit_score is your confidence from 0 to 1 that the purchase fits the purpose, the role and the industry.
 
-Policy limits, pre-approval and anomaly checks are applied by the system after you answer, so do
-not flag an expense only because of its amount.
+Policy limits, pre-approval, purchase timing and anomaly checks (duplicates, split purchases,
+unusual amounts, weekend or late-night purchases) are applied by the system after you answer. Do
+not flag an expense or ask the employee a question because of its amount or its timestamp alone:
+card payments are often charged at a different time than the purchase.
 
 Finish by calling exactly one of submit_decision or ask_employee. Do not answer in plain text."""
 
@@ -33,7 +38,9 @@ AGENT_TASK = """Review this expense.
 {expense}
 </expense>
 
-Allowed categories: {categories}
+Categories (use the id on the left; the examples show what the company files under each):
+{categories}
+
 Allowed tax rule ids: {rules}"""
 
 VISION_RECEIPT = """Read this receipt and return its contents.

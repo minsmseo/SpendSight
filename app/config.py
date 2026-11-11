@@ -36,7 +36,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "").strip() or "gpt-6.1-sol"
 
 ENABLE_LOCAL_SUMMARIZER = os.getenv("ENABLE_LOCAL_SUMMARIZER", "0") == "1"
 
-COMPANY_TZ = os.getenv("COMPANY_TZ", "America/Los_Angeles")   # weekend / late-night / same-day checks
+COMPANY_TZ = os.getenv("COMPANY_TZ", "").strip() or "America/Los_Angeles"   # weekend / late-night / same-day checks
 
 MAX_FOLLOWUP_ROUNDS = 2
 AGENT_MAX_TOOL_CALLS = 6

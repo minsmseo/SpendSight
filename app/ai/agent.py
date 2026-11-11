@@ -92,6 +92,15 @@ def _company_profile(ctx: dict) -> dict:
     }
 
 
+def _receipt_kind(e) -> str:
+    """What stands behind this expense as a receipt, in words the model cannot misread."""
+    if e.source == "paypal":
+        return "PayPal itemized order (structured receipt from PayPal; this is the receipt)"
+    if e.source == "import":
+        return "PayPal transaction record (imported account history)"
+    return "uploaded receipt image" if e.receipt_path else "no receipt attached"
+
+
 def _expense_view(session, ctx: dict) -> dict:
     from app.models import Employee
 
@@ -103,7 +112,7 @@ def _expense_view(session, ctx: dict) -> dict:
         "total": e.total, "tax": e.tax_amount, "currency": e.currency,
         "business_purpose": e.purpose or "(none given)", "attendees": e.attendees or "(none given)",
         "employee": {"id": emp.id, "name": emp.name, "role": emp.role_title, "department": emp.department} if emp else None,
-        "paypal_order_id": e.paypal_order_id, "has_receipt_image": bool(e.receipt_path),
+        "paypal_order_id": e.paypal_order_id, "receipt": _receipt_kind(e),
         "line_items": [{"line_id": i.id, "name": i.name, "quantity": i.quantity, "amount": i.amount} for i in ctx["items"]],
         "follow_ups": [{"question": f.question, "answer": f.answer} for f in ctx["followups"]],
     }
@@ -156,7 +165,9 @@ def _run_agent(provider, session, ctx: dict) -> AgentDecision:
     task = prompts.AGENT_TASK.format(
         company=json.dumps(_company_profile(ctx)),
         expense=json.dumps(_expense_view(session, ctx)),
-        categories=", ".join(engine.load_taxonomy()["categories"]),
+        categories="\n".join(
+            f"- {cid}: {c['label']}" + (f" (for example: {', '.join(c['keywords'][:10])})" if c["keywords"] else "")
+            for cid, c in engine.load_taxonomy()["categories"].items()),
         rules=", ".join(r["id"] for r in engine.load_rule_pack()["rules"]),
     )
     messages: list = [{"role": "user", "content": task}]

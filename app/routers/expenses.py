@@ -259,7 +259,9 @@ def answer_followup(expense_id: int, body: AnswerBody, session: Session = Depend
     followup.answer = body.answer.strip()
     session.add(followup)
     templates = engine.load_taxonomy()["question_templates"]
-    if not expense.attendees and followup.question in {templates[k] for k in engine.ATTENDEE_QUESTIONS}:
+    last = _latest(session, expense_id, automated=True)
+    who_missing = bool(last) and bool({"attendees", "recipient_name"} & set(json.loads(last.missing_json)))
+    if not expense.attendees and (who_missing or followup.question in {templates[k] for k in engine.ATTENDEE_QUESTIONS}):
         expense.attendees = followup.answer       # the answer is the attendee list: keep it on the record
         session.add(expense)
     session.commit()

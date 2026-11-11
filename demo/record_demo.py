@@ -11,6 +11,7 @@ has to approve in the PayPal window by hand.
 """
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -75,9 +76,14 @@ class Demo:
         self.page.wait_for_timeout(int(seconds * 1000))
 
     def say(self, text: str, hold: float = 0.0) -> None:
-        self.page.evaluate(
-            """t => { try { sessionStorage.setItem('demoCaption', t); } catch (e) {} const b = document.getElementById('demo-caption');
-                      if (b) { b.textContent = t; b.style.display = t ? 'block' : 'none'; } }""", text)
+        script = """t => { try { sessionStorage.setItem('demoCaption', t); } catch (e) {} const b = document.getElementById('demo-caption');
+                      if (b) { b.textContent = t; b.style.display = t ? 'block' : 'none'; } }"""
+        for attempt in range(3):
+            try:
+                self.page.evaluate(script, text)
+                break
+            except Exception:                              # the page was mid-navigation: wait and try again
+                self.page.wait_for_load_state("networkidle")
         if hold:
             self.wait(hold * PACE)
 
@@ -99,6 +105,17 @@ class Demo:
         self.wait(0.15)
         locator.click()
         self.wait(pause)
+
+    def click_and_reload(self, locator) -> None:
+        """Click a button whose handler calls the API and then reloads the page (a review can take seconds)."""
+        locator = locator.first
+        locator.scroll_into_view_if_needed()
+        box = locator.bounding_box()
+        self.page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2, steps=22)
+        self.wait(0.15)
+        with self.page.expect_navigation(wait_until="networkidle", timeout=120000):
+            locator.click()
+        self.wait(0.3)
 
     def type(self, locator, text: str) -> None:
         self.click(locator, pause=0.1)
@@ -141,155 +158,173 @@ class Demo:
         return next(r["status"] for r in rows if r["id"] == expense_id)
 
     # --- the story ---
+    def row(self, expense_id: int) -> dict:
+        rows = self.page.request.get(BASE + "/api/expenses").json()
+        return next(r for r in rows if r["id"] == expense_id)
+
+    def reviewing(self, text: str = "The AI agent reads the receipt, looks up the tax rule and writes its reasons...") -> None:
+        self.say(text)
+
     def run(self) -> None:
         p = self.page
+        ai = self.page.request.get(BASE + "/api/status").json()["ai"]
+        live_ai = ai["state"] == "connected"
+        who = "The AI agent" if live_ai else "SpendSight"
+
+        # Prepare the side stories while the intro plays (each review takes a few seconds with a live model).
+        side: dict = {}
+
+        def prepare() -> None:
+            import httpx
+
+            def buy(cart: dict) -> dict:
+                with httpx.Client(base_url=BASE, timeout=120) as http:
+                    order = http.post("/api/paypal/orders", json=cart).json()
+                    return http.post(f"/api/paypal/orders/{order['order_id']}/complete").json()
+
+            side["asked"] = buy({"employee_id": 3, "vendor_id": "steakhouse21",
+                                 "items": [{"sku": "st-dinner-2", "quantity": 1}, {"sku": "st-wine", "quantity": 1}],
+                                 "purpose": DINNER_PURPOSE})["expense_id"]
+            accessories = {"employee_id": 2, "vendor_id": "officedepotish", "items": [{"sku": "od-dock", "quantity": 1}],
+                           "purpose": "Laptop accessories for new engineer workstation"}
+            buy(accessories)
+            side["split"] = buy(accessories)["expense_id"]
+            buy({"employee_id": 2, "vendor_id": "fitnessclub", "items": [{"sku": "fc-month", "quantity": 1}], "purpose": "team wellness"})
+
+        worker = threading.Thread(target=prepare, daemon=True)
+        worker.start()
+
+        # Pitch: the problem, who it is for, why it matters
         self.card("Build What's Next with PayPal and AI", "SpendSight",
-                  ["AI expense auditor for US corporations, built on PayPal."], 4)
-        self.card("The problem", "Two questions for every expense",
-                  ["1. Is it reimbursable under company policy?",
-                   "2. How much is tax deductible under 2026 US rules?",
-                   "A $186 client dinner: fully reimbursable, only 50% deductible."], 7)
+                  ["An AI expense auditor for US companies, built on PayPal."], 3.2)
+        self.card("The problem", "Every expense needs two answers",
+                  ["Finance teams check receipts by hand: is this reimbursable under our policy?",
+                   "Their CPA asks a different question: how much of it is tax deductible?",
+                   "A $186 client dinner is fully reimbursable, but only 50% deductible.",
+                   "SpendSight answers both at the moment of purchase, and shows its reasoning."], 9)
 
         # Dashboard
         self.go("/role/finance")
-        self.say("Finance dashboard: where every submitted dollar ends up.", 4.5)
+        self.say("For the finance team: where every submitted dollar ends up, and what needs a decision.", 4.2)
         self.scroll(1050)
-        self.say("And the expenses to confirm with the CPA, each with the reason why.", 5)
+        self.say("For the CPA: the expenses whose tax treatment needs a second look, each with the reason.", 4.2)
 
-        # Onboarding: industry + policy document
-        self.go("/onboarding")
-        self.say("Onboarding: choose the industry and upload the company expense policy.", 2.5)
-        p.set_input_files("input[name=policy_file]", str(ROOT / "demo" / "policy_acme.md"))
-        self.click(p.get_by_role("button", name="Upload and analyze"), pause=0)
-        p.wait_for_load_state("networkidle")
-        p.locator("#policyGrid").scroll_into_view_if_needed()
-        self.say("The policy is summarized and turned into a rule table that Finance edits and confirms.", 5.5)
-        self.click(p.get_by_role("button", name="Confirm policy"), pause=1.6)
-
-        # Channel A: buy through PayPal
+        # Channel A: buy through PayPal, reviewed by the agent
         self.go("/role/employee")
         self.go("/store")
-        self.say("An employee buys through PayPal. The itemized PayPal order is the receipt: no upload, no typing.", 2)
+        self.say("An employee pays a vendor through PayPal. The itemized PayPal order is the receipt.", 1.5)
         self.add_item("Dinner for two")
         self.add_item("Wine pairing")
         self.type(p.locator("aside textarea"), DINNER_PURPOSE)
         self.type(p.locator("aside input").last, "Jane Doe (Globex CTO, customer), Alice Chen")
+        self.reviewing()
         dinner = self.pay()
-        self.say("Reviewed in seconds: reimbursable, and 50% deductible as a client meal. $93 of $186.", 6)
-        print("client dinner:", self.status(dinner))
+        r = self.row(dinner)
+        print("client dinner:", r["status"], r["engine"], r["deductible_amount"], r["question"])
+        if r["status"] == "approved" and r["deductible_amount"] == 93.0:
+            self.say(f"{who} approves it: reimbursable in full, 50% deductible as a client meal. $93 of $186.", 6)
+        else:
+            self.say(f"{who} explains its decision. The deductible share always comes from the tax rule pack.", 6)
 
         # Follow-up question
-        self.go("/store")
-        self.say("The same dinner from another employee, this time without attendees.", 1)
-        p.locator("aside select").select_option(label="Carol Singh")
-        self.add_item("Dinner for two")
-        self.add_item("Wine pairing")
-        self.type(p.locator("aside textarea"), DINNER_PURPOSE)
-        asked = self.pay()
+        worker.join(timeout=150)
+        asked = side["asked"]
+        self.go(f"/expenses/{asked}")
         box = p.get_by_placeholder("Answer as Carol Singh")
         box.scroll_into_view_if_needed()
-        self.say("Tax rules require who attended, so SpendSight asks instead of guessing.", 4)
-        self.type(box, "Jane Doe, CTO of Globex, our customer")
-        self.click(p.get_by_role("button", name="Answer", exact=True), pause=0)
-        p.wait_for_load_state("networkidle")
-        self.say("The employee answers and the review reruns: approved.", 4)
-        print("dinner after answer:", self.status(asked))
+        self.say("The same dinner without attendees: tax rules need to know who was there, so it asks instead of guessing.", 4.5)
+        self.type(box, "Jane Doe, CTO of Globex (our customer), and me, Carol Singh")
+        self.reviewing("The employee answers, and the review runs again...")
+        self.click_and_reload(p.get_by_role("button", name="Answer", exact=True))
+        r = self.row(asked)
+        print("dinner after answer:", r["status"], r["engine"], r["question"])
+        self.say("Approved after one answer." if r["status"] == "approved" else "The answer is on the record and the decision is updated.", 3.2)
 
         # Pre-approval hold: authorize, then capture
         self.go("/store")
-        self.say("A $1,150 hotel is above the pre-approval threshold.", 0.5)
         self.add_item("Hotel room, 3 nights")
+        self.say("A $1,150 hotel is above the pre-approval limit, so PayPal only authorizes the payment.", 1.2)
         self.type(p.locator("aside textarea"), "Hotel for DataCon conference in Las Vegas, Dec 1 to Dec 4")
-        self.say("PayPal only authorizes the payment. Nothing is captured until Finance decides.", 3.5)
         hotel = self.pay()
         self.go("/role/finance")
         self.go(f"/expenses/{hotel}")
-        self.say("Finance sees the held payment. Approve captures the authorization; reject voids it.", 4)
-        self.click(p.get_by_role("button", name="Approve and capture"), pause=0)
-        p.wait_for_load_state("networkidle")
-        self.say("Approved: the PayPal authorization is captured.", 3)
-        print("hotel:", self.status(hotel))
+        self.say("Nothing is captured until Finance decides. Approve captures the authorization; reject voids it.", 4.2)
+        self.click_and_reload(p.get_by_role("button", name="Approve and capture"))
+        print("hotel:", self.row(hotel)["status"])
+        self.say("Approved: the PayPal authorization is captured.", 2.6)
 
-        # Channel B: paper receipt, and the industry override
+        # Channel B: paper receipt read by the model
         self.go("/role/employee")
         self.go("/employee")
-        self.say("Paper receipts work too.", 0.5)
         p.set_input_files("input[name=receipt]", str(ROOT / "demo" / "receipts" / "office_snacks.png"))
+        self.say("Paper receipts work too. " + ("A vision model reads the image..." if live_ai else "OCR reads the image..."))
         self.click(p.get_by_role("button", name="Upload"), pause=0)
         p.wait_for_load_state("networkidle")
-        self.say("Without an AI key, OCR and a parser read the vendor, date, total and items.", 4)
+        self.say("Vendor, date, total and items are filled in for the employee to confirm.", 3)
         self.type(p.locator("textarea[name=purpose]"), "Snacks and coffee for the office")
+        self.reviewing()
         self.click(p.get_by_role("button", name="Submit for review"), pause=0)
         p.wait_for_url("**/expenses/*", wait_until="networkidle")
         snacks = self.expense_id()
-        self.say("Office snacks: reimbursable, but 0% deductible from 2026 (IRC 274(o)).", 5.5)
-        self.go("/role/finance")
-        self.api_form("/onboarding/company", {"name": "Acme Analytics Inc.", "industry_id": "restaurant"})
-        self.go(f"/expenses/{snacks}")
-        self.say("Change the company's industry to restaurant and run the review again...", 1.5)
-        self.click(p.get_by_role("button", name="Re-run review"), pause=0)
-        p.wait_for_load_state("networkidle")
-        self.say("...and the same receipt is deductible: staff meals are an industry exception.", 5)
-        self.api_form("/onboarding/company", {"name": "Acme Analytics Inc.", "industry_id": "software_saas"})
-        self.api(f"/api/expenses/{snacks}/review")
+        r = self.row(snacks)
+        print("office snacks:", r["status"], r["engine"], r["deductible_amount"])
+        if r["deductible_amount"] == 0:
+            self.say("Office snacks: reimbursable, but 0% deductible from 2026 under IRC 274(o).", 5)
+        else:
+            self.say("The agent picks the category; the tax rule pack sets the deductible share.", 5)
 
         # Anomaly: split purchase
-        accessories = {"employee_id": 2, "vendor_id": "officedepotish", "items": [{"sku": "od-dock", "quantity": 1}],
-                       "purpose": "Laptop accessories for new engineer workstation"}
-        self.buy_quietly(accessories)
-        split = self.buy_quietly(accessories)["expense_id"]
-        self.buy_quietly({"employee_id": 2, "vendor_id": "fitnessclub", "items": [{"sku": "fc-month", "quantity": 1}],
-                          "purpose": "team wellness"})
-        self.go(f"/expenses/{split}")
-        self.say("Two $240 orders on the same day against a $300 limit: flagged as a split purchase.", 4)
-        p.locator("#spcWrap").scroll_into_view_if_needed()
-        self.say("A control chart compares each purchase with the employee's history.", 4)
+        self.go("/role/finance")
+        self.go(f"/expenses/{side['split']}")
+        self.say("Two $240 orders on one day against a $300 limit: flagged as a split purchase.", 3.6)
+        if p.locator("#spcWrap").is_visible():
+            p.locator("#spcWrap").scroll_into_view_if_needed()
+            self.say("A control chart compares each purchase with past spending.", 3)
 
         # Queue
         self.go("/finance/queue")
-        self.say("The review queue runs on AG Grid: every expense with its decision and engine.", 3)
-        self.click(p.locator("button[data-status=flagged]"), pause=1.6)
-        self.click(p.locator("button[data-status=rejected]"), pause=1.6)
-        self.say('A gym membership filed as "team wellness" is rejected as personal.', 3)
-        self.click(p.locator("button[data-status='']"), pause=0.6)
+        self.say("The review queue runs on AG Grid: every expense with its decision and the engine that made it.", 3.2)
+        self.click(p.locator("button[data-status=rejected]"), pause=0.8)
+        self.say('A gym membership filed as "team wellness" is rejected as personal.', 2.8)
 
         # Tax rules: reviewed defaults that the CPA can adjust
         self.go("/tax-rules")
-        self.say("Every deductible rate starts from a reviewed default with its citation. The CPA owns this table.", 4)
+        self.say("The AI never sets a tax rate. Rates come from reviewed defaults with citations, and the CPA owns them.", 4)
         rate = p.get_by_label("Rate for Other ordinary and necessary business expense")
         self.click(rate, pause=0.1)
         p.keyboard.press("Control+A")
         p.keyboard.type("0", delay=60)
         p.keyboard.press("Tab")
-        self.say("Changing a rate always shows the reviewed default first, and records the reason.", 1.5)
+        self.say("Changing a rate always shows the reviewed default first, and records the reason.", 1.2)
         p.keyboard.type("Hold at 0% until our CPA reviews these", delay=14)
-        self.wait(2.2 * PACE)
-        self.click(p.get_by_role("button", name="Change to 0%"), pause=1.0)
-        p.locator("text=Category keywords").first.scroll_into_view_if_needed()
-        self.say("Rates and keywords are data, so another country is just another rule pack.", 4)
+        self.wait(2.0 * PACE)
+        self.click(p.get_by_role("button", name="Change to 0%"), pause=0.8)
+        self.say("Rates and keywords are data, so another country is another rule pack.", 3.2)
 
         # Payouts
         self.go("/reimburse")
-        self.say("Approved expenses are reimbursed in one PayPal Payouts batch: one payment per employee.", 3)
+        self.say("Approved expenses are reimbursed in one PayPal Payouts batch: one payment per employee.", 2.6)
         self.click(p.get_by_role("button", name="Send PayPal Payouts"), pause=0)
         p.locator("text=Payout batches").scroll_into_view_if_needed()
         p.wait_for_selector("text=succeeded", timeout=20000)
-        self.say("Status is tracked by webhook and by polling until every payment succeeds.", 3.5)
+        self.say("Status is tracked by webhook and by polling until every payment succeeds.", 3)
 
         # Tax report
         self.go("/reports/tax")
-        self.say("The tax report splits spend by category and Form 1120 line, and lists missing documents.", 5)
+        self.say("The tax report splits spend by category and Form 1120 line, and lists missing documents.", 4)
         with p.expect_download() as download:
             self.click(p.get_by_role("link", name="Export CPA package (XLSX)"), pause=0)
         download.value.save_as(str(OUT / "cpa_package.xlsx"))
-        self.say("One click exports the CPA package: summary, lines, missing documents and every decision.", 4.5)
+        self.say("One click exports the CPA package, with every decision and its reasons.", 3.4)
 
+        recorded = (f"Recorded with a live AI model ({ai.get('model', '')}) and the PayPal mock client."
+                    if live_ai else "Recorded with no AI key and the PayPal mock client: every step ran on the built-in fallbacks.")
         self.card("How it is built", "PayPal at the center. AI with a safety net.",
                   ["PayPal: Orders v2 (capture, authorize, void), Payouts, Webhooks, Transaction Search.",
-                   "AI: expense agent, receipt vision and policy reading, guarded by a tax rule pack.",
-                   "Rates, keywords and citations are editable data: a CPA adjusts them, another country adds a rule pack.",
-                   "This recording uses no AI key and the mock PayPal client: every step ran on the built-in fallbacks.",
-                   "github.com/minsmseo/SpendSight"], 9)
+                   "AI: an expense agent with tools, receipt vision and policy reading.",
+                   "If the AI key is missing or fails, a rule engine and OCR take over. Nothing stops.",
+                   recorded,
+                   "github.com/minsmseo/SpendSight"], 8)
 
     def api_form(self, path: str, form: dict) -> None:
         self.page.request.post(BASE + path, form=form)
