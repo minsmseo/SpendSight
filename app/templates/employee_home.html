@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}My expenses · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">My expenses</h1>
+  <form method="get" class="text-sm">
+    Signed in as
+    <select name="employee_id" onchange="this.form.submit()" class="border border-slate-300 rounded-lg px-2 py-1">
+      {% for emp in employees %}<option value="{{ emp.id }}" {{ "selected" if emp.id == employee_id }}>{{ emp.name }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<div class="grid md:grid-cols-2 gap-4 mb-8">
+  <a href="/store" class="bg-indigo-600 text-white rounded-xl p-5 hover:bg-indigo-700">
+    <div class="font-semibold">Buy through PayPal</div>
+    <div class="text-sm opacity-80">Receipt arrives automatically. No manual entry.</div>
+  </a>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <div class="font-semibold">Upload a receipt</div>
+    <div class="text-sm text-slate-500">Image or PDF. Coming in build step 4.</div>
+  </div>
+</div>
+<table class="w-full text-sm bg-white rounded-xl border border-slate-200">
+  <thead class="text-left text-slate-500 border-b"><tr><th class="p-3">Status</th><th>Vendor</th><th>Date</th><th class="text-right pr-3">Total</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="border-b border-slate-100">
+      <td class="p-3"><span class="chip chip-{{ r.status }}">{{ r.status.replace("_", " ") }}</span></td>
+      <td><a class="text-indigo-600 hover:underline" href="/expenses/{{ r.id }}">{{ r.vendor }}</a>
+        {% if r.question %}<div class="text-xs text-yellow-700">Agent asks: {{ r.question }}</div>{% endif %}</td>
+      <td>{{ (r.purchased_at or "")[:10] }}</td>
+      <td class="text-right pr-3">${{ "%.2f"|format(r.total) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,5 @@
+# Optional: local Hugging Face summarizer (ENABLE_LOCAL_SUMMARIZER=1).
+# Kept out of requirements.txt so the Render Docker image stays small.
+transformers>=4.44
+torch>=2.3
+sentencepiece>=0.2

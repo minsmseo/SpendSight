@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Finance queue · {{ app_name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Finance queue</h1>
+  <input id="quick" placeholder="Search…" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-64">
+</div>
+<div id="grid" class="ag-theme-quartz" style="height: 70vh"></div>
+<script>
+  const usd = p => p.value == null ? "" : "$" + Number(p.value).toFixed(2);
+  const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
+  const sourceLabel = {paypal: "PayPal", upload: "Receipt", import: "Import"};
+  const gridOptions = {
+    columnDefs: [
+      {field: "status", width: 130, filter: true, cellRenderer: p => chip("chip-" + p.value, p.value.replace("_", " "))},
+      {field: "employee", filter: true, width: 150},
+      {field: "vendor", filter: true, flex: 1, minWidth: 170,
+       cellRenderer: p => `<a class="text-indigo-600 hover:underline" href="/expenses/${p.data.id}">${p.value}</a>`},
+      {field: "purchased_at", headerName: "Date", width: 120, valueFormatter: p => (p.value || "").slice(0, 10), sort: "desc"},
+      {field: "category", filter: true, width: 150},
+      {field: "total", width: 110, type: "rightAligned", valueFormatter: usd},
+      {field: "reimbursable", width: 130, valueFormatter: p => p.value == null ? "" : (p.value ? "Yes" : "No")},
+      {field: "deductible_amount", headerName: "Deductible", width: 120, type: "rightAligned", valueFormatter: usd},
+      {field: "engine", width: 100, cellRenderer: p => p.value ? chip("badge-" + p.value, p.value) : ""},
+      {field: "anomalies", headerName: "⚠", width: 70, valueFormatter: p => p.value ? "⚠ " + p.value : ""},
+      {field: "source", width: 100, valueFormatter: p => sourceLabel[p.value] || p.value},
+    ],
+    defaultColDef: {sortable: true, resizable: true},
+    rowSelection: "multiple",
+    pagination: true,
+    paginationPageSize: 50,
+  };
+  const api = agGrid.createGrid(document.getElementById("grid"), gridOptions);
+  fetch("/api/expenses").then(r => r.json()).then(rows => api.setGridOption("rowData", rows));
+  document.getElementById("quick").addEventListener("input", e => api.setGridOption("quickFilterText", e.target.value));
+</script>
+{% endblock %}

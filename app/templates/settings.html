@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Settings</h1>
+<section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold mb-1">AI provider</h2>
+  <p class="text-sm mb-3">Status: <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label }}</span></p>
+  <form method="post" action="/settings/ai-key" class="flex flex-wrap gap-3 items-end text-sm">
+    <label>Provider<br>
+      <select name="provider" class="border border-slate-300 rounded-lg px-2 py-1.5">
+        <option value="anthropic">Anthropic ({{ anthropic_model }})</option>
+        <option value="openai">OpenAI ({{ openai_model }})</option>
+      </select>
+    </label>
+    <label>API key<br><input type="password" name="key" autocomplete="off" class="border border-slate-300 rounded-lg px-3 py-1.5 w-80"></label>
+    <button class="bg-indigo-600 text-white rounded-lg px-4 py-1.5">Save for this session</button>
+  </form>
+  <p class="text-xs text-slate-400 mt-2">Kept in server memory only. Never written to disk or logs. Leave empty and save to clear. Without a key everything runs on the rule engine.</p>
+</section>
+<section class="bg-white rounded-xl border border-slate-200 p-5 text-sm">
+  <h2 class="font-semibold mb-2">Environment</h2>
+  <p>PayPal mode: <span class="chip chip-draft">{{ paypal_mode }}</span></p>
+  <p class="mt-1">Local summarizer: {{ "enabled" if local_summarizer else "off (TextRank fallback)" }}</p>
+</section>
+{% endblock %}

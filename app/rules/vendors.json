@@ -1,0 +1,41 @@
+{
+  "vendors": [
+    {"id": "steakhouse21", "name": "Steakhouse 21", "category": "meal", "paypal_category": "PHYSICAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "st-dinner-2", "name": "Dinner for two (prix fixe)", "price": 148.00},
+      {"sku": "st-wine", "name": "Wine pairing", "price": 38.00},
+      {"sku": "st-dinner-1", "name": "Dinner entree", "price": 62.00}
+    ]},
+    {"id": "coffeeco", "name": "Coffee & Co", "category": "meal", "paypal_category": "PHYSICAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "cf-box", "name": "Office coffee box (12 cups)", "price": 34.00},
+      {"sku": "cf-snacks", "name": "Assorted office snacks", "price": 30.00},
+      {"sku": "cf-latte", "name": "Latte", "price": 5.50}
+    ]},
+    {"id": "cloudstack", "name": "CloudStack SaaS", "category": "software", "paypal_category": "DIGITAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "cs-team", "name": "Team plan subscription (monthly)", "price": 199.00},
+      {"sku": "cs-seat", "name": "Additional seat", "price": 29.00}
+    ]},
+    {"id": "skyair", "name": "SkyAir", "category": "travel_transport", "paypal_category": "DIGITAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "sa-sfo-nyc", "name": "Economy airfare SFO to NYC (round trip)", "price": 468.00},
+      {"sku": "sa-bag", "name": "Checked baggage", "price": 35.00}
+    ]},
+    {"id": "hotellumen", "name": "Hotel Lumen", "category": "lodging", "paypal_category": "DIGITAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "hl-3n", "name": "Hotel room, 3 nights (conference rate)", "price": 1150.00},
+      {"sku": "hl-1n", "name": "Hotel room, 1 night", "price": 289.00}
+    ]},
+    {"id": "officedepotish", "name": "Office Depotish", "category": "office_supplies", "paypal_category": "PHYSICAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "od-dock", "name": "Laptop accessory bundle (dock + cables)", "price": 240.00},
+      {"sku": "od-paper", "name": "Printer paper (case)", "price": 42.00},
+      {"sku": "od-headset", "name": "Wireless headset", "price": 89.00}
+    ]},
+    {"id": "stadiumtickets", "name": "Stadium Tickets", "category": "entertainment", "paypal_category": "DIGITAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "tk-pair", "name": "Game tickets (2 seats)", "price": 420.00}
+    ]},
+    {"id": "giftboxco", "name": "Gift Box Co", "category": "gift", "paypal_category": "PHYSICAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "gb-std", "name": "Client thank-you gift box", "price": 60.00},
+      {"sku": "gb-mini", "name": "Mini gift box", "price": 24.00}
+    ]},
+    {"id": "fitnessclub", "name": "Fitness Club", "category": "personal", "paypal_category": "DIGITAL_GOODS", "tax_rate": 0.0, "items": [
+      {"sku": "fc-month", "name": "Gym membership (monthly)", "price": 79.00}
+    ]}
+  ]
+}

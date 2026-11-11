@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: spendsight
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_NAME
+        value: SpendSight
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ENABLE_LOCAL_SUMMARIZER
+        value: "0"
+      - key: DATABASE_URL
+        value: sqlite:///./spendsight.db

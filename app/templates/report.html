@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Tax report · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Tax report · 2026 (Form 1120)</h1>
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+  {% for label, value in [("Total spent", summary.spent), ("Deductible", summary.deductible), ("Nondeductible", summary.nondeductible)] %}
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="text-xs text-slate-500">{{ label }}</div>
+    <div class="text-2xl font-semibold">${{ "{:,.2f}".format(value) }}</div>
+  </div>
+  {% endfor %}
+</div>
+<section class="bg-white rounded-xl border border-slate-200 p-5">
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Category</th><th>Form 1120 line</th><th class="text-right">Spent</th><th class="text-right">Deductible</th><th class="text-right">Nondeductible</th></tr></thead>
+    <tbody>
+    {% for r in summary.rows %}
+      <tr class="border-b border-slate-100"><td class="py-1">{{ r.category }}</td><td>{{ r.form1120_line }}</td>
+        <td class="text-right">${{ "{:,.2f}".format(r.spent) }}</td><td class="text-right">${{ "{:,.2f}".format(r.deductible) }}</td><td class="text-right">${{ "{:,.2f}".format(r.nondeductible) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="mt-4 text-xs text-slate-500">{{ disclaimer }}</p>
+  <p class="mt-1 text-xs text-slate-400">Coming in build step 8: period picker, missing substantiation, CPA package export (XLSX / CSV).</p>
+</section>
+{% endblock %}

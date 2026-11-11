@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Vendor Store · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Vendor Store</h1>
+<p class="text-sm text-slate-500 mb-6">
+  Demo vendors. Carts above ${{ preapproval_threshold }} are held (PayPal authorization) until Finance reviews.
+  {% if mock %}PayPal is in mock mode: checkout will use a "Simulate PayPal payment" button.{% endif %}
+</p>
+<div class="grid md:grid-cols-3 gap-4">
+  {% for v in vendors %}
+  <section class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold">{{ v.name }}</h2>
+    <div class="text-xs text-slate-400 mb-3">{{ v.category }}</div>
+    <ul class="text-sm space-y-1">
+      {% for it in v["items"] %}
+      <li class="flex justify-between"><span>{{ it.name }}</span><span class="font-mono">${{ "%.2f"|format(it.price) }}</span></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+<p class="mt-6 text-xs text-slate-400">Coming in build step 3: cart, business purpose and attendees fields, PayPal button.</p>
+{% endblock %}

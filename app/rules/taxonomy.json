@@ -1,0 +1,167 @@
+{
+  "categories": {
+    "meal": {
+      "label": "Meals",
+      "keywords": ["dinner", "lunch", "breakfast", "steak", "restaurant", "cafe", "coffee", "latte", "espresso", "snack", "snacks", "pizza", "catering", "sandwich", "bagel", "pastry", "beverage", "wine", "entree", "appetizer", "dessert", "tip", "gratuity"],
+      "vendor_hints": ["Steakhouse 21", "Coffee & Co", "grill", "bistro", "kitchen", "diner", "bakery"],
+      "default_rule": "meal_client",
+      "is_travel": false
+    },
+    "entertainment": {
+      "label": "Entertainment",
+      "keywords": ["ticket", "tickets", "stadium", "game", "concert", "show", "golf", "green fee", "club dues", "theater", "suite", "season pass"],
+      "vendor_hints": ["Stadium Tickets", "arena", "theatre", "golf club"],
+      "default_rule": "entertainment",
+      "is_travel": false
+    },
+    "gift": {
+      "label": "Gifts",
+      "keywords": ["gift", "gift box", "gift card", "gift basket", "hamper", "flowers", "bouquet"],
+      "vendor_hints": ["Gift Box Co"],
+      "default_rule": "gift",
+      "is_travel": false
+    },
+    "travel_transport": {
+      "label": "Travel: transport",
+      "keywords": ["airfare", "flight", "airline", "train", "rail", "rideshare", "taxi", "uber", "lyft", "rental car", "baggage", "economy", "boarding"],
+      "vendor_hints": ["SkyAir", "RideNow", "airways", "airlines"],
+      "default_rule": "travel_transport",
+      "is_travel": true
+    },
+    "lodging": {
+      "label": "Travel: lodging",
+      "keywords": ["hotel", "room night", "nights", "lodging", "resort fee", "room rate", "suite night", "inn"],
+      "vendor_hints": ["Hotel Lumen", "hotel", "inn", "suites"],
+      "default_rule": "lodging",
+      "is_travel": true
+    },
+    "software": {
+      "label": "Software / SaaS",
+      "keywords": ["subscription", "saas", "license", "seat", "seats", "cloud", "hosting", "api credits", "plan", "software", "domain"],
+      "vendor_hints": ["CloudStack SaaS", "cloud", "software"],
+      "default_rule": "software",
+      "is_travel": false
+    },
+    "office_supplies": {
+      "label": "Office supplies",
+      "keywords": ["paper", "pens", "toner", "notebook", "stapler", "keyboard", "mouse", "monitor", "cable", "dock", "docking", "laptop stand", "laptop accessory", "accessories", "headset", "webcam", "chair", "desk", "whiteboard", "adapter", "charger"],
+      "vendor_hints": ["Office Depotish", "office"],
+      "default_rule": "office_supplies",
+      "is_travel": false
+    },
+    "advertising": {
+      "label": "Advertising",
+      "keywords": ["ads", "ad spend", "advertising", "campaign", "sponsored", "billboard", "promo", "marketing", "banner"],
+      "vendor_hints": ["AdReach"],
+      "default_rule": "advertising",
+      "is_travel": false
+    },
+    "company_event": {
+      "label": "Company event",
+      "keywords": ["holiday party", "offsite", "all-hands", "team event", "team building", "picnic"],
+      "vendor_hints": [],
+      "default_rule": "event_all_staff",
+      "is_travel": false
+    },
+    "fines_penalties": {
+      "label": "Fines and penalties",
+      "keywords": ["fine", "penalty", "parking ticket", "citation", "late fee", "violation"],
+      "vendor_hints": [],
+      "default_rule": "fines_penalties",
+      "is_travel": false
+    },
+    "political": {
+      "label": "Political",
+      "keywords": ["campaign contribution", "political", "pac", "lobbying", "donation to candidate"],
+      "vendor_hints": [],
+      "default_rule": "political",
+      "is_travel": false
+    },
+    "personal": {
+      "label": "Personal",
+      "keywords": ["gym", "fitness", "membership", "personal training", "yoga", "groceries", "clothing", "spa", "massage", "commute", "commuting"],
+      "vendor_hints": ["Fitness Club"],
+      "default_rule": "personal",
+      "is_travel": false
+    },
+    "shipping": {
+      "label": "Shipping",
+      "keywords": ["shipping", "postage", "freight", "courier", "packaging", "boxes", "labels"],
+      "vendor_hints": [],
+      "default_rule": "other_business",
+      "is_travel": false
+    },
+    "fuel": {
+      "label": "Fuel",
+      "keywords": ["fuel", "gasoline", "diesel", "gas station"],
+      "vendor_hints": [],
+      "default_rule": "other_business",
+      "is_travel": false
+    },
+    "tools_equipment": {
+      "label": "Tools and equipment",
+      "keywords": ["drill", "saw", "tools", "equipment", "safety gear", "helmet", "gloves", "ladder", "generator"],
+      "vendor_hints": [],
+      "default_rule": "office_supplies",
+      "is_travel": false
+    },
+    "inventory": {
+      "label": "Inventory",
+      "keywords": ["inventory", "wholesale", "resale", "bulk order", "food supplies", "ingredients"],
+      "vendor_hints": [],
+      "default_rule": "inventory",
+      "is_travel": false
+    },
+    "other": {
+      "label": "Other",
+      "keywords": [],
+      "vendor_hints": [],
+      "default_rule": "other_business",
+      "is_travel": false
+    }
+  },
+  "purpose_intents": {
+    "client_meeting": {
+      "keywords": ["client", "customer", "prospect", "partner", "renewal", "deal", "pitch", "vendor meeting", "investor"],
+      "fits_categories": ["meal", "entertainment", "gift", "travel_transport", "lodging"],
+      "meal_rule": "meal_client"
+    },
+    "travel": {
+      "keywords": ["conference", "trip", "travel", "onsite", "on-site visit", "summit", "flight to", "visit to"],
+      "fits_categories": ["travel_transport", "lodging", "meal"],
+      "meal_rule": "meal_travel"
+    },
+    "company_event": {
+      "keywords": ["team", "offsite", "holiday party", "all-hands", "all hands", "team building", "kickoff"],
+      "fits_categories": ["company_event", "meal", "entertainment"],
+      "meal_rule": "event_all_staff"
+    },
+    "office_provisions": {
+      "keywords": ["snacks", "office coffee", "coffee for office", "for the office", "pantry", "overtime", "working late", "kitchen restock"],
+      "fits_categories": ["meal"],
+      "meal_rule": "meal_convenience"
+    },
+    "gift": {
+      "keywords": ["gift", "thank you", "thank-you", "congratulations", "anniversary"],
+      "fits_categories": ["gift"],
+      "meal_rule": null
+    },
+    "operations": {
+      "keywords": ["subscription", "license", "tooling", "supplies", "equipment", "campaign", "ads", "hosting", "upgrade", "replacement", "workstation"],
+      "fits_categories": ["software", "office_supplies", "advertising", "shipping", "fuel", "tools_equipment", "inventory"],
+      "meal_rule": null
+    },
+    "personal": {
+      "keywords": ["gym", "wellness", "birthday", "family", "home", "personal", "my own", "weekend getaway"],
+      "fits_categories": ["personal"],
+      "meal_rule": null
+    }
+  },
+  "question_templates": {
+    "meal_attendees": "Who attended this meal, and what is their business relationship to the company?",
+    "gift_recipient": "Who received this gift, and what is their business relationship to the company?",
+    "travel_details": "What was the destination and what were the dates of this business trip?",
+    "vague_purpose": "What was the specific business purpose of this expense?",
+    "entertainment_attendees": "Who attended, and was any business discussed before, during or after the event?"
+  }
+}

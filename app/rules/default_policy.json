@@ -1,0 +1,20 @@
+{
+  "preapproval_threshold": 1000,
+  "receipt_required_above": 75,
+  "late_night_window": ["22:00", "05:00"],
+  "banned_items": ["gym membership", "personal clothing", "alcohol only", "traffic fines", "political contributions"],
+  "rows": [
+    {"category": "meal", "per_txn_limit": 250, "preapproval_above": 500, "receipt_required_above": 25, "banned": false, "notes": "Attendees required for client meals."},
+    {"category": "entertainment", "per_txn_limit": 500, "preapproval_above": 300, "receipt_required_above": 0, "banned": false, "notes": "Client entertainment only, with attendees."},
+    {"category": "gift", "per_txn_limit": 100, "preapproval_above": 100, "receipt_required_above": 0, "banned": false, "notes": "Recipient name required."},
+    {"category": "travel_transport", "per_txn_limit": 800, "preapproval_above": 1000, "receipt_required_above": 75, "banned": false, "notes": "Economy class."},
+    {"category": "lodging", "per_txn_limit": 1500, "preapproval_above": 1000, "receipt_required_above": 0, "banned": false, "notes": "Up to $350 per night."},
+    {"category": "software", "per_txn_limit": 500, "preapproval_above": 500, "receipt_required_above": 75, "banned": false, "notes": ""},
+    {"category": "office_supplies", "per_txn_limit": 300, "preapproval_above": 300, "receipt_required_above": 75, "banned": false, "notes": ""},
+    {"category": "advertising", "per_txn_limit": 1000, "preapproval_above": 1000, "receipt_required_above": 75, "banned": false, "notes": ""},
+    {"category": "company_event", "per_txn_limit": 1000, "preapproval_above": 500, "receipt_required_above": 75, "banned": false, "notes": "Open to all employees."},
+    {"category": "personal", "per_txn_limit": 0, "preapproval_above": 0, "receipt_required_above": 0, "banned": true, "notes": "Not reimbursable."},
+    {"category": "fines_penalties", "per_txn_limit": 0, "preapproval_above": 0, "receipt_required_above": 0, "banned": true, "notes": "Not reimbursable."},
+    {"category": "political", "per_txn_limit": 0, "preapproval_above": 0, "receipt_required_above": 0, "banned": true, "notes": "Not reimbursable."}
+  ]
+}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Onboarding · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Onboarding</h1>
+<form method="post" action="/onboarding/company" class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold mb-3">Company</h2>
+  <div class="flex flex-wrap gap-4 items-end text-sm">
+    <label>Name<br><input name="name" value="{{ company.name }}" class="border border-slate-300 rounded-lg px-3 py-1.5 w-64"></label>
+    <label>Entity type<br><input disabled value="C corporation (Form 1120)" class="border border-slate-200 bg-slate-50 rounded-lg px-3 py-1.5 w-56"></label>
+    <button class="bg-indigo-600 text-white rounded-lg px-4 py-1.5">Save</button>
+  </div>
+  <h3 class="text-sm text-slate-500 mt-5 mb-2">Industry</h3>
+  <div class="grid md:grid-cols-5 gap-3">
+    {% for ind in industries %}
+    <label class="border rounded-xl p-3 text-sm cursor-pointer {{ 'border-indigo-600 bg-indigo-50' if ind.id == company.industry_id else 'border-slate-200' }}">
+      <input type="radio" name="industry_id" value="{{ ind.id }}" {{ "checked" if ind.id == company.industry_id }} class="mr-1">
+      <span class="font-medium">{{ ind.label }}</span>
+      <div class="text-xs text-slate-400 mt-1">NAICS {{ ind.naics_hint }}</div>
+    </label>
+    {% endfor %}
+  </div>
+</form>
+<section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+  <h2 class="font-semibold mb-3">Expense policy</h2>
+  <p class="text-sm text-slate-500 mb-3">Pre-approval above ${{ policy.preapproval_threshold }}. Policy upload, summary and editable grid arrive in build step 6.</p>
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Category</th><th>Per-transaction limit</th><th>Pre-approval above</th><th>Receipt above</th><th>Banned</th><th>Notes</th></tr></thead>
+    <tbody>
+    {% for row in policy.rows %}
+      <tr class="border-b border-slate-100"><td class="py-1">{{ row.category }}</td><td>${{ row.per_txn_limit }}</td><td>${{ row.preapproval_above }}</td><td>${{ row.receipt_required_above }}</td><td>{{ "Yes" if row.banned else "" }}</td><td class="text-slate-500">{{ row.notes }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="bg-white rounded-xl border border-slate-200 p-5">
+  <h2 class="font-semibold mb-3">Employees</h2>
+  <table class="w-full text-sm">
+    <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Name</th><th>Role</th><th>Department</th><th>PayPal email (payouts)</th><th>Default project</th></tr></thead>
+    <tbody>
+    {% for emp in employees %}
+      <tr class="border-b border-slate-100"><td class="py-1">{{ emp.name }}</td><td>{{ emp.role_title }}</td><td>{{ emp.department }}</td><td class="font-mono">{{ emp.paypal_email }}</td><td>{{ emp.default_project }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

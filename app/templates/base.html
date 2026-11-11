@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center gap-6">
+      <a href="/" class="text-lg font-bold text-indigo-600">{{ app_name }}</a>
+      <nav class="flex gap-4 text-sm text-slate-600">
+        {% if role == "employee" %}
+          <a class="hover:text-indigo-600" href="/employee">My expenses</a>
+          <a class="hover:text-indigo-600" href="/store">Buy through PayPal</a>
+        {% else %}
+          <a class="hover:text-indigo-600" href="/onboarding">Onboarding</a>
+          <a class="hover:text-indigo-600" href="/finance/queue">Queue</a>
+          <a class="hover:text-indigo-600" href="/reimburse">Reimburse</a>
+          <a class="hover:text-indigo-600" href="/reports/tax">Tax report</a>
+          <a class="hover:text-indigo-600" href="/settings">Settings</a>
+        {% endif %}
+      </nav>
+      <div class="ml-auto flex items-center gap-3 text-xs">
+        <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label }}</span>
+        <span class="chip chip-draft">PayPal: {{ paypal_mode }}</span>
+        <div class="flex rounded-lg border border-slate-300 overflow-hidden">
+          <a href="/role/employee" class="px-3 py-1 {{ 'bg-indigo-600 text-white' if role == 'employee' else 'bg-white' }}">Employee view</a>
+          <a href="/role/finance" class="px-3 py-1 {{ 'bg-indigo-600 text-white' if role == 'finance' else 'bg-white' }}">Finance view</a>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="text-center text-xs text-slate-400 py-4">
+    {{ app_name }} &middot; &copy; 2026 {{ author }} &middot; {{ disclaimer }}
+  </footer>
+</body>
+</html>

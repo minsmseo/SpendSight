@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Expense #{{ e.id }} · {{ app_name }}{% endblock %}
+{% block content %}
+<a href="/finance/queue" class="text-sm text-indigo-600">&larr; Back to queue</a>
+<div class="flex items-center gap-3 mt-2 mb-6">
+  <h1 class="text-2xl font-semibold">{{ e.vendor }} · ${{ "%.2f"|format(e.total) }}</h1>
+  <span class="chip chip-{{ e.status }}">{{ e.status.replace("_", " ") }}</span>
+  {% if decision %}<span class="chip badge-{{ decision.engine }}">{{ decision.engine }}</span>{% endif %}
+</div>
+<div class="grid md:grid-cols-2 gap-6">
+  <section class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-3">Receipt ({{ e.source }})</h2>
+    <dl class="text-sm grid grid-cols-3 gap-y-1 mb-4">
+      <dt class="text-slate-500">Employee</dt><dd class="col-span-2">{{ employee.name }} ({{ employee.role_title }})</dd>
+      <dt class="text-slate-500">Date</dt><dd class="col-span-2">{{ e.purchased_at.strftime("%Y-%m-%d %H:%M") if e.purchased_at else "—" }}</dd>
+      <dt class="text-slate-500">Purpose</dt><dd class="col-span-2">{{ e.purpose or "—" }}</dd>
+      <dt class="text-slate-500">Attendees</dt><dd class="col-span-2">{{ e.attendees or "—" }}</dd>
+      {% if e.paypal_order_id %}<dt class="text-slate-500">PayPal order</dt><dd class="col-span-2 font-mono">{{ e.paypal_order_id }}</dd>{% endif %}
+    </dl>
+    <table class="w-full text-sm">
+      <thead class="text-left text-slate-500 border-b"><tr><th class="py-1">Item</th><th>Category</th><th class="text-right">Amount</th><th class="text-right">Deductible</th></tr></thead>
+      <tbody>
+      {% for li in items %}
+        <tr class="border-b border-slate-100">
+          <td class="py-1">{{ li.name }}</td><td>{{ li.category }}</td>
+          <td class="text-right">${{ "%.2f"|format(li.amount) }}</td>
+          <td class="text-right">{{ li.deductible_pct|int }}% · ${{ "%.2f"|format(li.deductible_amount) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="bg-white rounded-xl border border-slate-200 p-5">
+    <h2 class="font-semibold mb-3">Decision</h2>
+    {% if decision %}
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="rounded-lg bg-slate-50 p-3">
+          <div class="text-xs text-slate-500">Reimbursable under policy?</div>
+          <div class="text-lg font-semibold">{{ "Yes" if decision.reimbursable else "No" }}</div>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-3">
+          <div class="text-xs text-slate-500">Deductible for tax</div>
+          <div class="text-lg font-semibold">${{ "%.2f"|format(items|sum(attribute="deductible_amount")) }}</div>
+        </div>
+      </div>
+      <ul class="text-sm list-disc ml-5 space-y-1">{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+      {% if decision.question %}<p class="mt-3 text-sm bg-yellow-50 border border-yellow-200 rounded-lg p-3">Agent question: {{ decision.question }}</p>{% endif %}
+      {% if missing %}<p class="mt-3 text-sm text-orange-700">Missing: {{ missing|join(", ") }}</p>{% endif %}
+      {% for a in anomalies %}<p class="mt-2 text-sm text-red-700">⚠ {{ a.explanation }}</p>{% endfor %}
+    {% else %}
+      <p class="text-sm text-slate-500">Not reviewed yet.</p>
+    {% endif %}
+    <p class="mt-6 text-xs text-slate-400">Coming next: follow-up thread, control chart, approve / reject / ask, capture or void authorization.</p>
+  </section>
+</div>
+{% endblock %}

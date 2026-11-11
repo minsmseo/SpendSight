@@ -1,0 +1,54 @@
+{
+  "industries": [
+    {
+      "id": "software_saas",
+      "label": "Software / SaaS",
+      "naics_hint": "5132, 5182, 5415",
+      "common_categories": ["software", "travel_transport", "lodging", "meal", "advertising", "office_supplies", "company_event"],
+      "unusual_categories": ["fuel", "tools_equipment", "inventory"],
+      "overrides": []
+    },
+    {
+      "id": "consulting",
+      "label": "Consulting / Professional services",
+      "naics_hint": "5416",
+      "common_categories": ["travel_transport", "lodging", "meal", "software", "office_supplies"],
+      "unusual_categories": ["inventory", "tools_equipment"],
+      "overrides": []
+    },
+    {
+      "id": "restaurant",
+      "label": "Restaurant / Food service",
+      "naics_hint": "7225",
+      "common_categories": ["meal", "inventory", "office_supplies", "tools_equipment", "advertising"],
+      "unusual_categories": ["lodging"],
+      "overrides": [
+        {
+          "rule_id": "meal_convenience",
+          "deductible_pct": 100,
+          "form1120_line": "26",
+          "form1120_label": "Other deductions (supporting statement: Staff meals)",
+          "citation": "IRC §274(o) restaurant exception (OBBBA 2025)",
+          "notes": "Meals a restaurant provides to its own staff stay deductible.",
+          "verify_with_cpa": true
+        }
+      ]
+    },
+    {
+      "id": "ecommerce_retail",
+      "label": "E-commerce / Retail",
+      "naics_hint": "4541, 44-45",
+      "common_categories": ["shipping", "inventory", "advertising", "software", "office_supplies"],
+      "unusual_categories": ["tools_equipment", "fuel"],
+      "overrides": []
+    },
+    {
+      "id": "construction",
+      "label": "Construction",
+      "naics_hint": "23",
+      "common_categories": ["tools_equipment", "fuel", "office_supplies", "travel_transport", "lodging", "meal"],
+      "unusual_categories": ["software", "advertising"],
+      "overrides": []
+    }
+  ]
+}
