@@ -123,3 +123,23 @@ class WebhookEvent(SQLModel, table=True):
     verified: bool = False
     payload_json: str = "{}"
     received_at: datetime = Field(default_factory=utcnow)
+
+
+class TaxRuleOverride(SQLModel, table=True):
+    """A deductible rate the company's CPA set in place of the reviewed default in the rule pack."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    rule_id: str = Field(index=True, unique=True)
+    deductible_pct: float = 0.0
+    note: str = ""
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class CategoryOverride(SQLModel, table=True):
+    """Company-specific keywords (and the tax rule they map to) for one expense category."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    category: str = Field(index=True, unique=True)
+    keywords_json: str = "[]"
+    default_rule: str = ""
+    updated_at: datetime = Field(default_factory=utcnow)

@@ -32,6 +32,8 @@ def cpa_review_items(session: Session, report: dict, company: Company) -> list[d
     for ln in report["lines"]:
         rule = engine.get_tax_rule(ln["rule_id"], company.industry_id)
         eid, amount, deductible = ln["expense_id"], ln["amount"], ln["deductible_amount"]
+        if rule.get("customized") and ln["deductible_pct"] == rule["deductible_pct"]:
+            add(eid, f"Deducted at {rule['deductible_pct']:g}% under a rate set by your CPA (reviewed default {rule['default_pct']:g}%, {rule['citation']}).", amount)
         if rule.get("confidence") == "low":
             add(eid, "No specific tax rule matched, so it is treated as a general business expense. Confirm the category and Form 1120 line.", amount)
         if rule.get("overridden_by_industry"):

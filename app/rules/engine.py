@@ -4,6 +4,7 @@ categorize -> purpose intent + fit score -> policy check -> tax treatment -> ano
 No tax logic is hardcoded here; percentages, citations and Form 1120 lines come from the JSON
 packs so another jurisdiction (`kr_2026.json`) can be added later.
 """
+import copy
 import json
 import re
 from datetime import datetime, timezone
@@ -35,8 +36,49 @@ def load_industries() -> dict[str, dict]:
 
 
 @lru_cache
-def load_taxonomy() -> dict:
+def base_taxonomy() -> dict:
+    """The taxonomy as shipped (reviewed defaults)."""
     return _load("taxonomy.json")
+
+
+# Company customizations made by the CPA in the Tax rules screen. Loaded from the database at
+# startup and after every change, so the pure decision code never needs a session.
+_rule_overrides: dict[str, dict] = {}          # rule id -> {"deductible_pct", "note"}
+_category_overrides: dict[str, dict] = {}      # category -> {"keywords", "default_rule"}
+_taxonomy: dict | None = None
+
+
+def load_taxonomy() -> dict:
+    """Taxonomy with the company's keyword changes applied."""
+    global _taxonomy
+    if _taxonomy is None:
+        merged = copy.deepcopy(base_taxonomy())
+        for category, ov in _category_overrides.items():
+            if category in merged["categories"]:
+                merged["categories"][category]["keywords"] = list(ov["keywords"])
+                if ov.get("default_rule"):
+                    merged["categories"][category]["default_rule"] = ov["default_rule"]
+                merged["categories"][category]["customized"] = True
+        _taxonomy = merged
+    return _taxonomy
+
+
+def set_overrides(rules: dict[str, dict], categories: dict[str, dict]) -> None:
+    global _rule_overrides, _category_overrides, _taxonomy
+    _rule_overrides, _category_overrides, _taxonomy = dict(rules), dict(categories), None
+
+
+def reload_overrides(session) -> None:
+    """Read the CPA's customizations from the database."""
+    from sqlmodel import select
+
+    from app.models import CategoryOverride, TaxRuleOverride
+
+    set_overrides(
+        {o.rule_id: {"deductible_pct": o.deductible_pct, "note": o.note} for o in session.exec(select(TaxRuleOverride)).all()},
+        {o.category: {"keywords": json.loads(o.keywords_json), "default_rule": o.default_rule}
+         for o in session.exec(select(CategoryOverride)).all()},
+    )
 
 
 @lru_cache
@@ -50,7 +92,7 @@ def load_vendors() -> list[dict]:
 
 
 def get_tax_rule(rule_id: str, industry_id: str | None = None, pack: str = "us_2026") -> dict:
-    """Rule pack entry with the industry override (if any) applied on top."""
+    """Rule pack entry with the industry override (if any) and the CPA's own rate (if any) applied."""
     rules = {r["id"]: r for r in load_rule_pack(pack)["rules"]}
     rule = dict(rules.get(rule_id) or rules["other_business"])
     industry = load_industries().get(industry_id or "")
@@ -59,6 +101,12 @@ def get_tax_rule(rule_id: str, industry_id: str | None = None, pack: str = "us_2
             if ov["rule_id"] == rule["id"]:
                 rule.update({k: v for k, v in ov.items() if k != "rule_id"})
                 rule["overridden_by_industry"] = industry["id"]
+    custom = _rule_overrides.get(rule["id"])
+    if custom is not None:                               # the CPA's rate wins; the default stays visible
+        rule["default_pct"] = rule["deductible_pct"]
+        rule["deductible_pct"] = custom["deductible_pct"]
+        rule["customized"] = True
+        rule["override_note"] = custom.get("note", "")
     return rule
 
 
@@ -228,6 +276,8 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
         rule = note["rule"]
         pct = round(note["deductible"] / note["amount"] * 100) if note["amount"] else 0
         extra = " (industry override)" if rule.get("overridden_by_industry") else ""
+        if rule.get("customized"):
+            extra += f" (rate set by your CPA; reviewed default {rule['default_pct']:g}%)"
         reasons.append(f"{rule['label']}: {pct}% deductible, {_money(note['deductible'])} of {_money(note['amount'])}, under {rule['citation']}{extra}.")
     n_tax_reasons = len(reasons)
     rule_ids = {ln["rule_id"] for ln in out_lines}

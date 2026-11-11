@@ -40,6 +40,11 @@ whose tax treatment depends on a judgment call, each with the reason to check it
 
 Every decision shows which engine produced it (`llm` or `rules`) and a plain one-sentence reason.
 
+**Tax rules are data the CPA controls.** Every deductible rate starts from a reviewed default with its
+citation (`app/rules/us_2026.json`). On the **Tax rules** screen the CPA can set a different rate or change the
+keywords that classify purchases; the app shows the reviewed default before a rate changes, keeps the reason,
+and restores the default in one click. Another country is another rule pack, not new code.
+
 ## How PayPal is used
 
 | API | Where | Status |
@@ -180,6 +185,12 @@ Sandbox payouts need a funded sandbox business balance.
 the secret environment variables in the dashboard, deploy, then register the service URL as the
 PayPal webhook (step 4 above). On the free plan the disk is ephemeral, so the SQLite database and
 uploaded receipts are reseeded on each deploy.
+
+## Demo video and screenshots
+
+`demo/record_demo.py` drives the real app in a browser and records the demo video (with captions) and the
+gallery screenshots into `submission/`. It needs `pip install playwright` and `python -m playwright install ffmpeg`,
+and an instance in mock PayPal mode (see the script header).
 
 ## Running without keys
 

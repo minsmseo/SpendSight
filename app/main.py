@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app import config
 from app.db import init_db
 from app.routers import (
+    tax_rules,
     dashboard,
     expenses,
     onboarding,
@@ -26,6 +27,13 @@ async def lifespan(app: FastAPI):
     from seed import seed_if_empty
 
     seed_if_empty()
+    from sqlmodel import Session
+
+    from app.db import engine as db_engine
+    from app.rules import engine as rules_engine
+
+    with Session(db_engine) as session:
+        rules_engine.reload_overrides(session)           # CPA-set rates and keywords
     config.UPLOAD_DIR.mkdir(exist_ok=True)
     yield
 
@@ -35,7 +43,7 @@ app.mount("/static", StaticFiles(directory=str(config.BASE_DIR / "static")), nam
 config.UPLOAD_DIR.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(config.UPLOAD_DIR)), name="uploads")
 
-for module in (dashboard, onboarding, expenses, paypal_checkout, paypal_import, webhooks, reimburse, reports, settings):
+for module in (dashboard, tax_rules, onboarding, expenses, paypal_checkout, paypal_import, webhooks, reimburse, reports, settings):
     app.include_router(module.router)
 
 

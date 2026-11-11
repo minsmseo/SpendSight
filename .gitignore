@@ -8,3 +8,5 @@ __pycache__/
 uploads/
 exports/
 .DS_Store
+submission/
+preview.db

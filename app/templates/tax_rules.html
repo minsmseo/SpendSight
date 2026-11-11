@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Tax rules · {{ app_name }}{% endblock %}
+{% block crumb %}Setup · Tax rules{% endblock %}
+{% block content %}
+<script>const TAX = {{ view|tojson }};</script>
+<div x-data="taxRules()">
+  <div class="flex flex-wrap items-end gap-4 mb-6">
+    <div class="mr-auto">
+      <h1 class="text-2xl font-semibold">Tax rules</h1>
+      <p class="page-sub">Every rate starts from a reviewed default with its citation. Your CPA can change a rate or the keywords that classify purchases; the default stays one click away.</p>
+    </div>
+    <span class="tag">rule pack {{ view.pack.id }}</span>
+    <span class="tag">{{ view.pack.jurisdiction }} · Form {{ view.pack.form }} · {{ view.pack.tax_year }}</span>
+    <span class="tag" :class="customized ? 'tag-warn' : ''" x-text="customized + ' customized'"></span>
+  </div>
+  <p x-show="error" x-text="error" class="text-sm text-red-700 mb-4"></p>
+
+  <section class="card p-5 mb-4">
+    <div class="flex items-baseline gap-3 mb-1">
+      <h2 class="font-semibold">Deductible rates</h2>
+      <span class="page-sub">{{ view.company }} · {{ view.industry }}</span>
+    </div>
+    <p class="page-sub mb-4">The AI or the rule engine decides which rule applies to a purchase. The percentage always comes from this table.</p>
+    <table class="w-full text-sm">
+      <thead class="text-left border-b border-slate-200">
+        <tr><th class="py-2 pr-3">Rule</th><th class="pr-3">Citation</th><th class="pr-3 text-right">Reviewed default</th><th class="pr-3 text-right w-44">Rate in use</th><th class="w-32"></th></tr>
+      </thead>
+      <tbody>
+        <template x-for="r in rules" :key="r.id">
+          <tr class="border-b border-slate-100 align-top">
+            <td class="py-2.5 pr-3">
+              <div class="font-medium" x-text="r.label"></div>
+              <div class="text-xs text-slate-500"><span class="num" x-text="r.id"></span><span x-show="r.industry_exception"> · industry exception applied</span><span x-show="r.cap" x-text="' · up to $' + r.cap + ' per recipient per year'"></span></div>
+              <div class="text-xs text-indigo-700 mt-0.5" x-show="r.customized && r.override_note" x-text="'CPA note: ' + r.override_note"></div>
+            </td>
+            <td class="py-2.5 pr-3 text-slate-600" x-text="r.citation"></td>
+            <td class="py-2.5 pr-3 text-right num" x-text="r.default_pct + '%'"></td>
+            <td class="py-2.5 pr-3 text-right">
+              <span class="inline-flex items-center gap-2 justify-end">
+                <span class="tag tag-warn" x-show="r.customized">CPA</span>
+                <input type="number" min="0" max="100" step="1" :value="r.deductible_pct" :aria-label="'Rate for ' + r.label"
+                       @change="ask(r, $event.target)" @keydown.enter="$event.target.blur()"
+                       class="num w-20 text-right border border-slate-300 rounded-lg px-2 py-1" :class="r.customized ? 'border-orange-300 bg-orange-50' : ''">
+                <span class="text-slate-500">%</span>
+              </span>
+            </td>
+            <td class="py-2.5 text-right"><button x-show="r.customized" @click="reset(r)" class="text-xs text-slate-600 underline hover:text-slate-900">Restore default</button></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card p-5">
+    <h2 class="font-semibold mb-1">Category keywords</h2>
+    <p class="page-sub mb-4">Without an AI key, purchases are classified by these keywords in the item and vendor names. Each category points at the tax rule above that sets its rate. Edit a list and press Save.</p>
+    <table class="w-full text-sm">
+      <thead class="text-left border-b border-slate-200"><tr><th class="py-2 pr-3 w-44">Category</th><th class="pr-3">Keywords</th><th class="pr-3 w-56">Tax rule</th><th class="w-40"></th></tr></thead>
+      <tbody>
+        <template x-for="c in categories" :key="c.id">
+          <tr class="border-b border-slate-100 align-top">
+            <td class="py-2.5 pr-3"><div class="font-medium" x-text="c.label"></div><span class="tag tag-warn mt-1" x-show="c.customized">customized</span></td>
+            <td class="py-2.5 pr-3"><textarea x-model="c.keywords" rows="2" :aria-label="'Keywords for ' + c.label" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-[13px]"></textarea></td>
+            <td class="py-2.5 pr-3">
+              <select x-model="c.default_rule" :aria-label="'Tax rule for ' + c.label" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 num text-[12.5px]">
+                <template x-for="id in ruleIds" :key="id"><option :value="id" x-text="id" :selected="id === c.default_rule"></option></template>
+              </select>
+            </td>
+            <td class="py-2.5 text-right whitespace-nowrap">
+              <button @click="saveCategory(c)" class="border border-slate-300 rounded-lg px-3 py-1 text-xs hover:border-slate-400">Save</button>
+              <button x-show="c.customized" @click="resetCategory(c)" class="text-xs text-slate-600 underline hover:text-slate-900 ml-2">Restore</button>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <p class="text-xs text-slate-500 mt-4">Changes apply to new reviews. Use "Re-run review" on an expense to apply them to it. {{ disclaimer }}</p>
+  </section>
+
+  <!-- Confirmation: always shows the reviewed default before a rate changes -->
+  <div x-show="pending" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(11,18,32,.45);" @keydown.escape.window="cancel()">
+    <div class="card p-6 w-full max-w-lg mx-4" role="dialog" aria-modal="true" aria-labelledby="rateTitle">
+      <div class="eyebrow mb-2">Change a deductible rate</div>
+      <h3 id="rateTitle" class="text-lg font-semibold mb-3" x-text="pending ? pending.rule.label : ''"></h3>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="rounded-lg bg-slate-50 border border-slate-200 p-3">
+          <div class="eyebrow">Reviewed default</div>
+          <div class="kpi-value num" x-text="pending ? pending.rule.default_pct + '%' : ''"></div>
+          <div class="text-xs text-slate-500 mt-1" x-text="pending ? pending.rule.citation : ''"></div>
+        </div>
+        <div class="rounded-lg bg-orange-50 border border-orange-200 p-3">
+          <div class="eyebrow">Your new rate</div>
+          <div class="kpi-value num" x-text="pending ? pending.value + '%' : ''"></div>
+          <div class="text-xs text-slate-500 mt-1">Applies to new reviews for this company</div>
+        </div>
+      </div>
+      <p class="text-sm text-slate-600 mb-3" x-show="pending && pending.rule.notes" x-text="pending ? pending.rule.notes : ''"></p>
+      <label class="block text-sm mb-4">Reason <span class="text-slate-400">(kept with the rule for the audit trail)</span>
+        <input x-model="note" x-ref="note" placeholder="e.g. Conservative position agreed with our CPA" class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5">
+      </label>
+      <div class="flex justify-end gap-2">
+        <button @click="cancel()" class="border border-slate-300 rounded-lg px-4 py-2 text-sm" x-text="pending ? 'Keep ' + pending.rule.deductible_pct + '%' : ''"></button>
+        <button @click="confirm()" :disabled="busy" class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50" x-text="pending ? 'Change to ' + pending.value + '%' : ''"></button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>[x-cloak] { display: none !important; }</style>
+<script>
+  function taxRules() {
+    return {
+      rules: TAX.rules, categories: TAX.categories, ruleIds: TAX.rule_ids, customized: TAX.customized_count,
+      pending: null, note: "", busy: false, error: "",
+      async call(method, url, body) {
+        const r = await fetch(url, {method, headers: {"Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(Array.isArray(data.detail) ? "Enter a rate between 0 and 100." : (data.detail || "Request failed"));
+        return data;
+      },
+      recount() { this.customized = this.rules.filter(r => r.customized).length + this.categories.filter(c => c.customized).length; },
+      replace(list, item) { const i = list.findIndex(x => x.id === item.id); list.splice(i, 1, item); this.recount(); },
+      ask(rule, input) {
+        const value = Number(input.value);
+        this.error = "";
+        if (input.value === "" || isNaN(value) || value < 0 || value > 100) { input.value = rule.deductible_pct; this.error = "Enter a rate between 0 and 100."; return; }
+        if (value === rule.deductible_pct) return;
+        this.pending = {rule, value, input};
+        this.note = "";
+        this.$nextTick(() => this.$refs.note.focus());
+      },
+      cancel() { if (this.pending) { this.pending.input.value = this.pending.rule.deductible_pct; this.pending = null; } },
+      async confirm() {
+        this.busy = true;
+        try { this.replace(this.rules, await this.call("PUT", "/api/tax-rules/" + this.pending.rule.id, {deductible_pct: this.pending.value, note: this.note})); this.pending = null; }
+        catch (e) { this.error = e.message; this.cancel(); }
+        this.busy = false;
+      },
+      async reset(rule) {
+        try { this.replace(this.rules, await this.call("DELETE", "/api/tax-rules/" + rule.id)); } catch (e) { this.error = e.message; }
+      },
+      async saveCategory(c) {
+        try { this.replace(this.categories, await this.call("PUT", "/api/tax-categories/" + c.id, {keywords: c.keywords, default_rule: c.default_rule})); this.error = ""; }
+        catch (e) { this.error = e.message; }
+      },
+      async resetCategory(c) {
+        try { this.replace(this.categories, await this.call("DELETE", "/api/tax-categories/" + c.id)); } catch (e) { this.error = e.message; }
+      },
+    };
+  }
+</script>
+{% endblock %}
