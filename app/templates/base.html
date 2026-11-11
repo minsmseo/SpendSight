@@ -26,7 +26,7 @@
         {% endif %}
       </nav>
       <div class="ml-auto flex items-center gap-3 text-xs">
-        <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label }}</span>
+        <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label if ai_status.state != "degraded" else "AI: degraded (rule engine)" }}</span>
         <span class="chip chip-draft">PayPal: {{ paypal_mode }}</span>
         <div class="flex rounded-lg border border-slate-300 overflow-hidden whitespace-nowrap">
           <a href="/role/employee" class="px-3 py-1 {{ 'bg-indigo-600 text-white' if role == 'employee' else 'bg-white' }}">Employee view</a>
@@ -35,6 +35,9 @@
       </div>
     </div>
   </header>
+  {% if ai_status.state == "degraded" %}
+  <div class="bg-orange-50 border-b border-orange-200 text-orange-900 text-sm text-center py-2 px-6">{{ ai_status.label }}</div>
+  {% endif %}
   <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1">
     {% block content %}{% endblock %}
   </main>

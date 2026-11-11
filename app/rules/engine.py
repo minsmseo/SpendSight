@@ -133,7 +133,7 @@ def _count_people(attendees: str) -> int:
 
 # --- the pipeline -----------------------------------------------------------
 def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), anomaly_fn=None,
-             now: datetime | None = None) -> dict:
+             now: datetime | None = None, rule_overrides: dict | None = None) -> dict:
     """Pure decision function. `expense` / `items` / `followups` are model-like objects.
 
     anomaly_fn(primary_category, per_txn_limit) -> [{rule, severity, explanation}] is called after
@@ -192,12 +192,16 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
 
     # 4. Tax treatment per line (rule pack + industry override decide the percentage).
     out_lines = []
+    all_rule_ids = {r["id"] for r in load_rule_pack()["rules"]}
+    n_fit_reasons = len(reasons)
     rule_notes: dict[str, dict] = {}
     for ln in lines:
         it, category = ln["item"], ln["category"]
         rule_id = cats.get(category, cats["other"])["default_rule"]
         if category == "meal" and intent and intents[intent].get("meal_rule"):
             rule_id = intents[intent]["meal_rule"]
+        if rule_overrides and rule_overrides.get(it.id) in all_rule_ids:
+            rule_id = rule_overrides[it.id]
         rule = get_tax_rule(rule_id, industry_id)
         pct = float(rule["deductible_pct"])
         deductible = round(it.amount * pct / 100, 2)
@@ -224,6 +228,7 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
         pct = round(note["deductible"] / note["amount"] * 100) if note["amount"] else 0
         extra = " (industry override)" if rule.get("overridden_by_industry") else ""
         reasons.append(f"{rule['label']}: {pct}% deductible, {_money(note['deductible'])} of {_money(note['amount'])}, under {rule['citation']}{extra}.")
+    n_tax_reasons = len(reasons)
     rule_ids = {ln["rule_id"] for ln in out_lines}
     line_cats = {ln["category"] for ln in out_lines}
 
@@ -301,6 +306,10 @@ def evaluate(*, expense, items, industry_id: str, policy: dict, followups=(), an
         "reimbursable": decision in ("approved", "flagged") and "over_limit" not in flags,
         "fit_score": fit,
         "reasons": reasons,
+        "fit_reasons": reasons[:n_fit_reasons],
+        "tax_reasons": reasons[n_fit_reasons:n_tax_reasons],
+        "policy_reasons": reasons[n_tax_reasons:],
+        "rejected_by_policy": rejected,
         "missing": sorted(set(missing)),
         "anomalies": anomalies,
         "flags": flags,
@@ -350,23 +359,39 @@ def apply_result(session, expense, result: dict) -> dict:
     return result
 
 
-def review_expense(session, expense_id: int) -> dict:
-    """Run the rules pipeline on a stored expense and persist the result."""
+def load_context(session, expense_id: int) -> dict:
+    """Everything a review needs: expense, company, policy, line items, follow-ups."""
     from sqlmodel import select
 
-    from app.anomaly import spc
     from app.models import Company, Expense, FollowUp, LineItem
 
     expense = session.get(Expense, expense_id)
     if expense is None:
         raise ValueError(f"expense {expense_id} not found")
     company = session.exec(select(Company)).first()
-    policy = json.loads(company.policy_json or "{}") or load_default_policy()
-    items = session.exec(select(LineItem).where(LineItem.expense_id == expense_id)).all()
-    followups = session.exec(select(FollowUp).where(FollowUp.expense_id == expense_id)).all()
-    result = evaluate(
-        expense=expense, items=items, industry_id=company.industry_id, policy=policy,
-        followups=followups,
+    return {
+        "expense": expense,
+        "company": company,
+        "policy": json.loads(company.policy_json or "{}") or load_default_policy(),
+        "items": session.exec(select(LineItem).where(LineItem.expense_id == expense_id)).all(),
+        "followups": session.exec(select(FollowUp).where(FollowUp.expense_id == expense_id).order_by(FollowUp.id)).all(),
+    }
+
+
+def run_rules(session, ctx: dict, rule_overrides: dict | None = None) -> dict:
+    """Rules decision for a loaded context, not persisted. `rule_overrides` maps line id -> rule id
+    (the LLM's choice of rule); percentages still come from the rule pack."""
+    from app.anomaly import spc
+
+    expense, items = ctx["expense"], ctx["items"]
+    return evaluate(
+        expense=expense, items=items, industry_id=ctx["company"].industry_id, policy=ctx["policy"],
+        followups=ctx["followups"], rule_overrides=rule_overrides,
         anomaly_fn=lambda category, limit: spc.check(session, expense, category, limit, len(items)),
     )
-    return apply_result(session, expense, result)
+
+
+def review_expense(session, expense_id: int) -> dict:
+    """Run the rules pipeline on a stored expense and persist the result."""
+    ctx = load_context(session, expense_id)
+    return apply_result(session, ctx["expense"], run_rules(session, ctx))

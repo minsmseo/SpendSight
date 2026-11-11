@@ -32,4 +32,25 @@ def set_ai_key(provider: str = Form(...), key: str = Form("")):
 def api_status():
     return {"ai": ai_provider.status(), "paypal": config.PAYPAL_MODE_LABEL}
 
-# TODO(step 5): POST /api/settings/ai-test (one tiny completion to validate the key).
+
+
+@router.post("/api/settings/ai-test")
+def ai_test():
+    """One tiny completion to check the configured key and model. Never returns the key."""
+    name = ai_provider.configured_provider()
+    if not name:
+        return {"ok": False, "error": "No AI key is set. The rule engine handles everything."}
+    provider = ai_provider.build_provider(name)
+    if provider is None:
+        return {"ok": False, "provider": name, "error": "Could not initialise the client."}
+    schema = {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"], "additionalProperties": False}
+    try:
+        provider.complete_json("You are a connectivity check.", 'Reply with {"ok": true}.', schema, timeout=30)
+    except ai_provider.ProviderError as exc:
+        kind = ai_provider.report_failure(exc)
+        return {"ok": False, "provider": name, "model": provider.model,
+                "error": f"{ai_provider.REASON_LABELS[kind]}: {str(exc)[:200]}"}
+    except Exception as exc:
+        return {"ok": False, "provider": name, "model": provider.model, "error": type(exc).__name__}
+    ai_provider.mark_degraded("", seconds=0)          # a working key clears an earlier degraded state
+    return {"ok": True, "provider": name, "model": provider.model}

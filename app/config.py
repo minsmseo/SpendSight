@@ -29,10 +29,10 @@ PAYPAL_MOCK = not (PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET)
 PAYPAL_MODE_LABEL = "mock" if PAYPAL_MOCK else PAYPAL_ENV
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-# TODO(step 5): verify model ids against provider docs before the demo.
-ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-sonnet-5-5"
+# Defaults checked against the provider model pages on 2026-11-11; override with the env vars.
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-opus-5-5"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "").strip() or "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "").strip() or "gpt-6.1-sol"
 
 ENABLE_LOCAL_SUMMARIZER = os.getenv("ENABLE_LOCAL_SUMMARIZER", "0") == "1"
 

@@ -4,7 +4,7 @@
 <h1 class="text-2xl font-semibold mb-6">Settings</h1>
 <section class="bg-white rounded-xl border border-slate-200 p-5 mb-6">
   <h2 class="font-semibold mb-1">AI provider</h2>
-  <p class="text-sm mb-3">Status: <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else 'badge-rules' }}">{{ ai_status.label }}</span></p>
+  <p class="text-sm mb-3">Status: <span class="chip {{ 'badge-llm' if ai_status.state == 'connected' else ('chip-flagged' if ai_status.state == 'degraded' else 'badge-rules') }}">{{ ai_status.label }}</span></p>
   <form method="post" action="/settings/ai-key" class="flex flex-wrap gap-3 items-end text-sm">
     <label>Provider<br>
       <select name="provider" class="border border-slate-300 rounded-lg px-2 py-1.5">
@@ -15,6 +15,25 @@
     <label>API key<br><input type="password" name="key" autocomplete="off" class="border border-slate-300 rounded-lg px-3 py-1.5 w-80"></label>
     <button class="bg-indigo-600 text-white rounded-lg px-4 py-1.5">Save for this session</button>
   </form>
+  <div class="mt-3 flex items-center gap-3 text-sm" x-data="aiTest()">
+    <button type="button" @click="run()" :disabled="busy" class="border border-slate-300 rounded-lg px-4 py-1.5 disabled:opacity-50">Test connection</button>
+    <span x-show="busy" class="text-slate-500">Calling the model…</span>
+    <span x-show="result && result.ok" class="text-green-700" x-text="result ? 'Connected: ' + result.provider + ' · ' + result.model : ''"></span>
+    <span x-show="result && !result.ok" class="text-red-700" x-text="result ? result.error : ''"></span>
+  </div>
+  <script>
+    function aiTest() {
+      return {
+        busy: false, result: null,
+        async run() {
+          this.busy = true; this.result = null;
+          try { this.result = await (await fetch("/api/settings/ai-test", {method: "POST"})).json(); }
+          catch (e) { this.result = {ok: false, error: "Request failed"}; }
+          this.busy = false;
+        },
+      };
+    }
+  </script>
   <p class="text-xs text-slate-400 mt-2">Kept in server memory only. Never written to disk or logs. Leave empty and save to clear. Without a key everything runs on the rule engine.</p>
 </section>
 <section class="bg-white rounded-xl border border-slate-200 p-5 text-sm">
